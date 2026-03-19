@@ -18,9 +18,9 @@
 
 ## Public API Migration
 - [x] Implement `/api/public-price`
-- [ ] Implement `/api/rides/active`
-- [ ] Implement `/api/rides/upcoming`
-- [ ] Implement `/api/rides/[rideId]/leaderboard`
+- [x] Implement `/api/rides/active`
+- [x] Implement `/api/rides/upcoming`
+- [x] Implement `/api/rides/[rideId]/leaderboard`
 - [ ] Implement public ws feed strategy
 
 ## Auth Migration

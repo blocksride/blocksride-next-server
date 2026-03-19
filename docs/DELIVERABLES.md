@@ -12,6 +12,7 @@
 - public price route migrated
   - initial Coinbase-backed route handler implemented
 - rides and leaderboard REST routes migrated
+  - initial Supabase-backed ride metadata routes implemented
 
 ## Phase 3
 - Privy auth route migration
