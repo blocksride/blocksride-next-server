@@ -44,3 +44,9 @@ Use one Next.js application as the main runtime and keep long-running keeper tas
 - ws / native WebSocket support as needed
 - Supabase REST
 - Privy verification
+
+## Current Actualized Work
+
+- health route implemented
+- env schema implemented
+- public price route implemented with in-memory cache and Coinbase fallback path

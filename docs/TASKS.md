@@ -17,7 +17,7 @@
 - [ ] Add sitemap/robots generation
 
 ## Public API Migration
-- [ ] Implement `/api/public-price`
+- [x] Implement `/api/public-price`
 - [ ] Implement `/api/rides/active`
 - [ ] Implement `/api/rides/upcoming`
 - [ ] Implement `/api/rides/[rideId]/leaderboard`

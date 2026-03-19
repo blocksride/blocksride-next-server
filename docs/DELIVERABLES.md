@@ -10,6 +10,7 @@
 - public landing/terminal routes migrated
 - SEO metadata handled in Next.js
 - public price route migrated
+  - initial Coinbase-backed route handler implemented
 - rides and leaderboard REST routes migrated
 
 ## Phase 3

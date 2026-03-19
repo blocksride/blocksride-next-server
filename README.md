@@ -23,3 +23,8 @@ This folder is the migration target and planning workspace. The first scaffold i
 - `src/server/` — server-only modules for relay, auth, market data, Supabase, and workers
 - `src/shared/` — shared types and constants
 - `docs/` — migration docs, PRD, plan, tasks, deliverables
+
+## Implemented Now
+
+- `GET /api/health`
+- `GET /api/public-price?asset_id=ETH-USD` with Coinbase-backed fetch and short in-memory cache
