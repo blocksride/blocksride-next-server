@@ -51,3 +51,4 @@ Use one Next.js application as the main runtime and keep long-running keeper tas
 - env schema implemented
 - public price route implemented with in-memory cache and Coinbase fallback path
 - Supabase-backed ride read routes implemented for active, upcoming, and leaderboard reads
+- initial auth/session routes implemented with cookie-based session handling

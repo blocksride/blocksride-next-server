@@ -30,3 +30,9 @@ Start the new codebase with a minimal but real runtime:
 - worker bootstrap placeholder
 
 That gives a live target to iterate on rather than docs only.
+
+## Actualized So Far
+
+- public price route migrated
+- ride metadata and leaderboard read routes migrated
+- initial Privy auth/session routes migrated

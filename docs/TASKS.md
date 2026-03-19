@@ -24,9 +24,9 @@
 - [ ] Implement public ws feed strategy
 
 ## Auth Migration
-- [ ] Implement `POST /api/auth/privy`
-- [ ] Implement `GET /api/auth/me`
-- [ ] Implement onboarding complete route
+- [x] Implement `POST /api/auth/privy`
+- [x] Implement `GET /api/auth/me`
+- [x] Implement onboarding complete route
 - [ ] Implement profile sync route
 
 ## Relay Migration

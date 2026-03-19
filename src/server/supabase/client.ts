@@ -1,6 +1,14 @@
 import { env } from "@/server/config/env";
 import type { LeaderboardEntry, Ride } from "@/shared/rides";
 
+export type UserProfile = {
+  user_id: string;
+  email?: string | null;
+  wallet_address?: string | null;
+  nickname?: string | null;
+  onboarding_completed: boolean;
+};
+
 const REST_BASE_PATH = "/rest/v1";
 
 function getRequiredSupabaseConfig() {
@@ -14,20 +22,26 @@ function getRequiredSupabaseConfig() {
   };
 }
 
-async function supabaseRequest<T>(path: string): Promise<T> {
+async function supabaseRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const { baseUrl, serviceRoleKey } = getRequiredSupabaseConfig();
   const response = await fetch(`${baseUrl}${REST_BASE_PATH}${path}`, {
-    method: "GET",
+    method: init?.method ?? "GET",
     headers: {
       apikey: serviceRoleKey,
       authorization: `Bearer ${serviceRoleKey}`,
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...(init?.headers ?? {})
     },
+    body: init?.body,
     cache: "no-store"
   });
 
   if (!response.ok) {
     throw new Error(`supabase rest error: ${await response.text()}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;
@@ -50,4 +64,29 @@ export async function getRideLeaderboard(rideId: string, limit = 10): Promise<Le
   return supabaseRequest<LeaderboardEntry[]>(
     `/leaderboard_entries?contest_id=eq.${encodeURIComponent(rideId)}&order=rank.asc&limit=${limit}`
   );
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  const profiles = await supabaseRequest<UserProfile[]>(`/user_profiles?user_id=eq.${encodeURIComponent(userId)}&limit=1`);
+  return profiles[0] ?? null;
+}
+
+export async function upsertUserProfile(profile: UserProfile): Promise<void> {
+  await supabaseRequest<void>("/user_profiles?on_conflict=user_id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify([profile])
+  });
+}
+
+export async function markOnboardingComplete(userId: string): Promise<void> {
+  await supabaseRequest<void>(`/user_profiles?user_id=eq.${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({ onboarding_completed: true })
+  });
 }

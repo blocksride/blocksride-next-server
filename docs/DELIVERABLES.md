@@ -17,6 +17,7 @@
 ## Phase 3
 - Privy auth route migration
 - backend session cookie migration
+  - initial Privy auth and session routes implemented
 - onboarding/profile sync migration
 
 ## Phase 4
