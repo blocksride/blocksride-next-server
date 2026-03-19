@@ -36,3 +36,4 @@ That gives a live target to iterate on rather than docs only.
 - public price route migrated
 - ride metadata and leaderboard read routes migrated
 - initial Privy auth/session routes migrated
+- relay nonce read routes migrated

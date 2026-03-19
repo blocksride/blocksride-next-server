@@ -30,3 +30,4 @@ This folder is the migration target and planning workspace. The first scaffold i
 - `GET /api/public-price?asset_id=ETH-USD` with Coinbase-backed fetch and short in-memory cache
 - `GET /api/rides/active`, `GET /api/rides/upcoming`, and `GET /api/rides/[rideId]/leaderboard` backed by Supabase REST
 - `POST /api/auth/privy`, `GET /api/auth/me`, and `POST /api/auth/onboarding/complete` with cookie-based session handling
+- `GET /api/relay/bet-nonce` and `GET /api/relay/claim-nonce` backed by viem contract reads
