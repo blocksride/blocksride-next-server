@@ -12,6 +12,7 @@ Replace the split `blocksride` + `blocksride-keeper` runtime with one Next.js-ba
 - Route handlers for auth, relay, rides, leaderboard, and public price data
 - Shared server modules for viem, Supabase, Privy, and relay logic
 - Worker entrypoints for settlement, seeding, and price refresh jobs
+- Next instrumentation hook to start internal workers in the same server process when enabled
 
 ## Status
 
@@ -34,3 +35,4 @@ This folder is the migration target and planning workspace. The first scaffold i
 - `POST /api/relay/bet` with request parsing, EIP-712 validation, allowance checks, permit support, and delayed submission scheduling
 - `DELETE /api/relay/bet/[intentId]` for undo-window cancellation
 - `POST /api/relay/claim` with EIP-712 claim validation, simulation, and immediate relayed submission
+- Internal price-refresh worker bootstrap via `src/instrumentation.ts` and `src/server/workers/priceRefresh.ts`

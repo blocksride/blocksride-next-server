@@ -39,5 +39,5 @@
 ## Worker Migration
 - [ ] Settlement loop
 - [ ] Seeding loop
-- [ ] Price refresh/cache loop
+- [x] Price refresh/cache loop
 - [ ] Admin seeding helpers
