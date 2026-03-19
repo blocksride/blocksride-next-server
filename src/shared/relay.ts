@@ -26,8 +26,18 @@ export const placeBetRequestSchema = z.object({
   permitS: z.string().optional()
 });
 
-export type PlaceBetRequest = z.infer<typeof placeBetRequestSchema>;
+export const submitClaimRequestSchema = z.object({
+  poolId: z.string(),
+  poolKey: poolKeySchema,
+  windowIds: z.array(z.string()).min(1),
+  nonce: z.string(),
+  deadline: z.string(),
+  signature: z.string(),
+  user: z.string()
+});
 
+export type PlaceBetRequest = z.infer<typeof placeBetRequestSchema>;
+export type SubmitClaimRequest = z.infer<typeof submitClaimRequestSchema>;
 export type PoolKeyInput = z.infer<typeof poolKeySchema>;
 
 export type PermitIntent = {
@@ -50,4 +60,14 @@ export type BetIntent = {
   signer: `0x${string}`;
   signature: `0x${string}`;
   permit?: PermitIntent;
+};
+
+export type ClaimIntent = {
+  poolId: `0x${string}`;
+  poolKey: PoolKeyInput;
+  windowIds: bigint[];
+  nonce: bigint;
+  deadline: bigint;
+  user: `0x${string}`;
+  signature: `0x${string}`;
 };

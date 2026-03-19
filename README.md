@@ -33,3 +33,4 @@ This folder is the migration target and planning workspace. The first scaffold i
 - `GET /api/relay/bet-nonce` and `GET /api/relay/claim-nonce` backed by viem contract reads
 - `POST /api/relay/bet` with request parsing, EIP-712 validation, allowance checks, permit support, and delayed submission scheduling
 - `DELETE /api/relay/bet/[intentId]` for undo-window cancellation
+- `POST /api/relay/claim` with EIP-712 claim validation, simulation, and immediate relayed submission

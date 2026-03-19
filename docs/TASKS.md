@@ -32,7 +32,7 @@
 ## Relay Migration
 - [x] Implement permit relay flow
 - [x] Implement bet relay flow
-- [ ] Implement claim relay flow
+- [x] Implement claim relay flow
 - [ ] Implement signer nonce manager
 - [ ] Add typed error mapping
 
