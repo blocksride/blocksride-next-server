@@ -23,6 +23,7 @@
 ## Phase 4
 - permit relay migration
 - bet relay migration
+  - initial bet relay route and permit path implemented
 - claim relay migration
 - nonce manager parity
 

@@ -37,3 +37,4 @@ That gives a live target to iterate on rather than docs only.
 - ride metadata and leaderboard read routes migrated
 - initial Privy auth/session routes migrated
 - relay nonce read routes migrated
+- initial bet relay scheduling and submission flow migrated

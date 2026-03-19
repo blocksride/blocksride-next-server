@@ -53,3 +53,4 @@ Use one Next.js application as the main runtime and keep long-running keeper tas
 - Supabase-backed ride read routes implemented for active, upcoming, and leaderboard reads
 - initial auth/session routes implemented with cookie-based session handling
 - relay nonce reads implemented with viem against the deployed hook
+- initial bet relay route implemented with validation, permit-aware scheduling, and on-chain submission

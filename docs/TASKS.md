@@ -30,8 +30,8 @@
 - [ ] Implement profile sync route
 
 ## Relay Migration
-- [ ] Implement permit relay flow
-- [ ] Implement bet relay flow
+- [x] Implement permit relay flow
+- [x] Implement bet relay flow
 - [ ] Implement claim relay flow
 - [ ] Implement signer nonce manager
 - [ ] Add typed error mapping

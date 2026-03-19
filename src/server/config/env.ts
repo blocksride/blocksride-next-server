@@ -7,6 +7,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   RPC_URL: z.string().url().optional(),
   PARIHOOK_CONTRACT_ADDRESS: z.string().optional(),
+  RELAYER_PRIVATE_KEY: z.string().optional(),
+  USDC_TOKEN_ADDRESS: z.string().optional(),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   PRIVY_APP_ID: z.string().optional(),
