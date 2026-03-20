@@ -13,6 +13,7 @@ import {
 import type { ClaimIntent, PoolKeyInput, SubmitClaimRequest } from "@/shared/relay";
 import { submitClaimRequestSchema } from "@/shared/relay";
 import { env } from "@/server/config/env";
+import { getKeeperPoolByPoolId } from "@/server/config/pools";
 import { getPublicClient, getRelayerAccount, getWalletClient } from "@/server/chain/client";
 import { pariHookWriteAbi } from "@/shared/abi/pariHookWrite";
 
@@ -43,10 +44,13 @@ export function parseSubmitClaimRequest(payload: unknown): SubmitClaimRequest {
   return submitClaimRequestSchema.parse(payload);
 }
 
-export function buildClaimIntent(request: SubmitClaimRequest): ClaimIntent {
+export async function buildClaimIntent(request: SubmitClaimRequest): Promise<ClaimIntent> {
+  const poolId = normalizeHex32(request.poolId, "poolId");
+  const poolKey = request.poolKey ? normalizePoolKey(request.poolKey) : resolvePoolKey(poolId);
+
   return {
-    poolId: normalizeHex32(request.poolId, "poolId"),
-    poolKey: normalizePoolKey(request.poolKey),
+    poolId,
+    poolKey,
     windowIds: request.windowIds.map((value) => parseBigIntDecimal(value, "windowId")),
     nonce: parseBigIntDecimal(request.nonce, "nonce"),
     deadline: parseBigIntDecimal(request.deadline, "deadline"),
@@ -256,6 +260,14 @@ function parseBigIntDecimal(value: string, field: string): bigint {
   } catch {
     throw new Error(`invalid ${field}`);
   }
+}
+
+function resolvePoolKey(poolId: `0x${string}`): PoolKeyInput {
+  const pool = getKeeperPoolByPoolId(poolId);
+  if (!pool) {
+    throw new Error("poolKey is required when poolId is not found in configured pools");
+  }
+  return pool.poolKey;
 }
 
 function splitSignature(signature: `0x${string}`): SignatureParts {

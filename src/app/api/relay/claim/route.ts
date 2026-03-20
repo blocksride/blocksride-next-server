@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const session = requireSession(request);
     const body = parseSubmitClaimRequest(await request.json());
-    const intent = buildClaimIntent(body);
+    const intent = await buildClaimIntent(body);
 
     if (session.user_id.toLowerCase() !== intent.user.toLowerCase()) {
       return NextResponse.json({ error: "Forbidden: user does not match session user" }, { status: 403 });

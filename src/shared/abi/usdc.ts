@@ -11,6 +11,13 @@ export const usdcAbi = [
   },
   {
     type: "function",
+    name: "nonces",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }]
+  },
+  {
+    type: "function",
     name: "permit",
     stateMutability: "nonpayable",
     inputs: [

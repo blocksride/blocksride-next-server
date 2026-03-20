@@ -1,40 +1,41 @@
 # Deliverables
 
 ## Phase 1
-- Next.js project scaffold
+- Next.js backend scaffold
 - shared env/config module
 - health route
 - docs: PRD, plan, tasks, deliverables
 
 ## Phase 2
-- public landing/terminal routes migrated
-- SEO metadata handled in Next.js
 - public price route migrated
-  - initial Coinbase-backed route handler implemented
-- rides and leaderboard REST routes migrated
-  - initial Supabase-backed ride metadata routes implemented
+- ride metadata and leaderboard routes migrated
+- auth/session baseline migrated
 
 ## Phase 3
-- Privy auth route migration
-- backend session cookie migration
-  - initial Privy auth and session routes implemented
-- onboarding/profile sync migration
-
-## Phase 4
 - permit relay migration
 - bet relay migration
-  - initial bet relay route and permit path implemented
 - claim relay migration
-- nonce manager parity
+- nonce read parity
+
+## Phase 4
+- client compatibility layer for the existing Vite frontend
+- `contests` aliases
+- `pools` route
+- `wallet/permit-info` route
+- `users/profile` route
+- `auth/logout` route
+- claim payload parity
 
 ## Phase 5
+- price refresh worker
 - settlement worker
 - seeding worker
-- optional payout worker
+- admin seeding helpers
 
 ## Definition of Done
-- frontend app served by Next.js
-- old Vite client no longer required for primary runtime
-- keeper API parity reached for public routes and relay routes
+- `blocksride/client` runs against `blocksride-next-server`
+- `blocksride-keeper` is no longer needed for primary local/prod runtime
+- relay flows work through the Next server
+- public price and metadata reads work through the Next server
 - worker jobs can run from the same application codebase
-- deployment docs updated
+- no duplicate frontend migration is required to reach keeper replacement parity

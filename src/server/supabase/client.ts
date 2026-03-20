@@ -56,6 +56,15 @@ export async function getUpcomingRides(limit = 10): Promise<Ride[]> {
   return supabaseRequest<Ride[]>(`/contests?status=eq.upcoming&order=start_time.asc&limit=${limit}`);
 }
 
+export async function getRideById(rideId: string): Promise<Ride | null> {
+  if (!rideId) {
+    return null;
+  }
+
+  const rides = await supabaseRequest<Ride[]>(`/contests?contest_id=eq.${encodeURIComponent(rideId)}&limit=1`);
+  return rides[0] ?? null;
+}
+
 export async function getRideLeaderboard(rideId: string, limit = 10): Promise<LeaderboardEntry[]> {
   if (!rideId) {
     return [];

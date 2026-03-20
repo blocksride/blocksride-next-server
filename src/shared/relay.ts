@@ -28,7 +28,7 @@ export const placeBetRequestSchema = z.object({
 
 export const submitClaimRequestSchema = z.object({
   poolId: z.string(),
-  poolKey: poolKeySchema,
+  poolKey: poolKeySchema.optional(),
   windowIds: z.array(z.string()).min(1),
   nonce: z.string(),
   deadline: z.string(),

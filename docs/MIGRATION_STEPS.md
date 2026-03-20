@@ -8,28 +8,25 @@
 ### Current backend/worker source
 - `blocksride-keeper`
 
+## Boundary
+
+`blocksride/client` remains the active frontend.
+
+This migration is about replacing the Go keeper behind that frontend. Do not port pages/components into this repo unless there is a separate explicit decision to migrate the UI.
+
 ## Mapping
 
-### Frontend
-- Vite pages/components -> Next.js app routes and components
-
 ### Keeper API
-- Go handlers -> Next route handlers
+- Go handlers -> Next route handlers under `src/app/api/*`
 - Go services -> `src/server/*` modules
 
 ### Worker logic
 - Go keeper loops -> `src/server/workers/*`
 
-## First Actualization Step
-
-Start the new codebase with a minimal but real runtime:
-- root package/tooling
-- Next app shell
-- health route
-- server config module
-- worker bootstrap placeholder
-
-That gives a live target to iterate on rather than docs only.
+### Client compatibility layer
+- preserve the request shapes currently used by `blocksride/client`
+- add aliases where naming differs (`contests` vs `rides`)
+- avoid unnecessary frontend changes until backend parity exists
 
 ## Actualized So Far
 
@@ -37,4 +34,12 @@ That gives a live target to iterate on rather than docs only.
 - ride metadata and leaderboard read routes migrated
 - initial Privy auth/session routes migrated
 - relay nonce read routes migrated
-- initial bet relay scheduling and submission flow migrated
+- bet relay scheduling and submission flow migrated
+- claim relay submission flow migrated
+- internal price-refresh worker migrated
+
+## Next Required Steps
+
+- port settlement worker
+- port seeding worker
+- review whether chat websocket support should be migrated or retired

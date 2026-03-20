@@ -2,31 +2,32 @@
 
 ## Architecture Decision
 
-Use one Next.js application as the main runtime and keep long-running keeper tasks as internal worker modules started by a dedicated bootstrap entrypoint.
+Use one Next.js server application as the backend runtime and keep long-running keeper tasks as internal worker modules started through server bootstrap/instrumentation.
+
+The current frontend remains `blocksride/client`.
 
 ## Sequence
 
-1. Scaffold Next.js app and shared server modules.
-2. Move public/static concerns first:
-   - homepage
-   - demo
-   - SEO
-   - `public-price`
-   - rides/leaderboard reads
-3. Move auth/session flows.
-4. Move relay endpoints.
-5. Move worker loops.
-6. Cut over traffic from Vite + Go keeper to Next server.
+1. Scaffold the TypeScript backend and shared server modules.
+2. Migrate read-only/public keeper endpoints first.
+3. Migrate auth/session flows.
+4. Migrate relay endpoints.
+5. Add client-compatibility routes and payload parity fixes.
+6. Migrate worker loops.
+7. Cut `blocksride/client` over from Go keeper to Next server.
 
 ## Migration Strategy
 
 ### Low-risk first
 - read-only/public endpoints
-- metadata and route structure
+- health
+- public price
+- ride/leaderboard metadata
 
 ### Medium-risk next
 - auth/session
 - Supabase sync
+- client compatibility aliases
 
 ### High-risk last
 - signed transaction relay
@@ -35,13 +36,10 @@ Use one Next.js application as the main runtime and keep long-running keeper tas
 
 ## Technical Stack
 
-- Next.js
+- Next.js route handlers
 - TypeScript
-- React
 - viem
 - zod
-- pino
-- ws / native WebSocket support as needed
 - Supabase REST
 - Privy verification
 
@@ -53,4 +51,13 @@ Use one Next.js application as the main runtime and keep long-running keeper tas
 - Supabase-backed ride read routes implemented for active, upcoming, and leaderboard reads
 - initial auth/session routes implemented with cookie-based session handling
 - relay nonce reads implemented with viem against the deployed hook
-- initial bet relay route implemented with validation, permit-aware scheduling, and on-chain submission
+- bet relay route implemented with validation, permit-aware scheduling, and on-chain submission
+- claim relay route implemented with validation, simulation, and direct relayed submission
+- internal price-refresh worker bootstrap implemented
+
+## Immediate Next Work
+
+- migrate settlement worker
+- migrate seeding/admin worker flows
+- decide whether chat websocket support should be migrated or retired
+- add relay hardening for signer nonce management and typed error mapping
