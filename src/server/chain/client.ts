@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, http } from "viem";
+import { createPublicClient, createWalletClient, getAddress, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, baseSepolia } from "viem/chains";
 
@@ -26,10 +26,33 @@ export function getRelayerAccount() {
   return privateKeyToAccount(key as `0x${string}`);
 }
 
+export function getKeeperAccount() {
+  const key = env.KEEPER_PRIVATE_KEY ?? env.RELAYER_PRIVATE_KEY;
+  if (!key || !key.startsWith("0x")) {
+    throw new Error("KEEPER_PRIVATE_KEY or RELAYER_PRIVATE_KEY is required");
+  }
+  return privateKeyToAccount(key as `0x${string}`);
+}
+
 export function getWalletClient() {
   return createWalletClient({
     account: getRelayerAccount(),
     chain: resolveChain(),
     transport: http(env.RPC_URL)
   });
+}
+
+export function getKeeperWalletClient() {
+  return createWalletClient({
+    account: getKeeperAccount(),
+    chain: resolveChain(),
+    transport: http(env.RPC_URL)
+  });
+}
+
+export function normalizeAddress(value: string, field: string): `0x${string}` {
+  if (!value || !value.startsWith("0x")) {
+    throw new Error(`${field} must be a valid address`);
+  }
+  return getAddress(value);
 }

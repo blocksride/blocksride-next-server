@@ -37,9 +37,12 @@
 - [ ] Add typed error mapping
 
 ## Worker Migration
-- [ ] Settlement loop
-- [ ] Seeding loop
-- [ ] Admin seeding helpers
+- [x] Settlement loop
+- [x] Seeding loop
+- [x] Admin seeding helpers
+
+## Remaining Worker Gaps
+- [ ] Decide whether to migrate automatic payout pushing (`pushPayouts`)
 
 ## Deferred / Legacy Surfaces
 - [x] Add synthetic `/api/grids/*` compatibility routes

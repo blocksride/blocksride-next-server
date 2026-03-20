@@ -1,11 +1,13 @@
 import { env } from "@/server/config/env";
 import { startPriceRefreshWorker, type PriceRefreshWorkerStatus } from "@/server/workers/priceRefresh";
+import { startSettlementWorker, type SettlementWorkerStatus } from "@/server/workers/settlement";
+import { startSeedingWorker, type SeedingWorkerStatus } from "@/server/workers/seeding";
 
 export type WorkerStatus =
   | PriceRefreshWorkerStatus
-  | { name: "price-refresh"; enabled: false; reason: string }
-  | { name: "settlement"; enabled: false; reason: string }
-  | { name: "seeding"; enabled: false; reason: string };
+  | SettlementWorkerStatus
+  | SeedingWorkerStatus
+  | { name: "price-refresh"; enabled: false; reason: string };
 
 let startPromise: Promise<{ started: boolean; workers: WorkerStatus[] }> | null = null;
 
@@ -20,8 +22,8 @@ export async function startWorkers() {
         started: false,
         workers: [
           { name: "price-refresh", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" },
-          { name: "settlement", enabled: false, reason: "not migrated yet" },
-          { name: "seeding", enabled: false, reason: "not migrated yet" }
+          { name: "settlement", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" },
+          { name: "seeding", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" }
         ] satisfies WorkerStatus[]
       };
     }
@@ -34,8 +36,8 @@ export async function startWorkers() {
       workers.push({ name: "price-refresh", enabled: false, reason: "PRICE_REFRESH_ENABLED=false" });
     }
 
-    workers.push({ name: "settlement", enabled: false, reason: "not migrated yet" });
-    workers.push({ name: "seeding", enabled: false, reason: "not migrated yet" });
+    workers.push(await startSettlementWorker(env.SETTLEMENT_POLL_INTERVAL_MS));
+    workers.push(await startSeedingWorker(env.SEEDING_POLL_INTERVAL_MS));
 
     return {
       started: true,

@@ -54,10 +54,11 @@ The current frontend remains `blocksride/client`.
 - bet relay route implemented with validation, permit-aware scheduling, and on-chain submission
 - claim relay route implemented with validation, simulation, and direct relayed submission
 - internal price-refresh worker bootstrap implemented
+- initial on-chain settlement worker implemented using Hermes + `PariHook.settle(...)`
+- initial seeding worker and admin seeding routes implemented
 
 ## Immediate Next Work
 
-- migrate settlement worker
-- migrate seeding/admin worker flows
+- decide whether automatic payout pushing should be migrated or whether claim-only is sufficient
 - decide whether chat websocket support should be migrated or retired
 - add relay hardening for signer nonce management and typed error mapping

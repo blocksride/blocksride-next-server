@@ -39,3 +39,9 @@
 - public price and metadata reads work through the Next server
 - worker jobs can run from the same application codebase
 - no duplicate frontend migration is required to reach keeper replacement parity
+
+## Worker Deliverables
+
+- Settlement worker polls configured pools, detects unsettled closed windows, fetches Hermes price updates, and submits `PariHook.settle(...)` transactions when enabled.
+
+- Seeding worker can process admin-armed windows, center keeper bets around the live price, and expose arm/disarm/status routes under `/api/admin/seeding/*`.

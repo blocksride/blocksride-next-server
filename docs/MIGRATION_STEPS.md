@@ -37,9 +37,11 @@ This migration is about replacing the Go keeper behind that frontend. Do not por
 - bet relay scheduling and submission flow migrated
 - claim relay submission flow migrated
 - internal price-refresh worker migrated
+- initial Hermes-backed settlement worker migrated
+- initial in-memory seeding/admin worker flow migrated
 
 ## Next Required Steps
 
-- port settlement worker
-- port seeding worker
+- decide whether automatic payout pushing should be migrated
 - review whether chat websocket support should be migrated or retired
+- harden relay + worker error handling and nonce policy
