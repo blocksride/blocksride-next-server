@@ -4,7 +4,7 @@
 
 Use one Next.js server application as the backend runtime and keep long-running keeper tasks as internal worker modules started through server bootstrap/instrumentation.
 
-The current frontend remains `blocksride/client`.
+The current frontend remains `blocksride/client`. `rides` is the canonical market naming; `contests` exists only as a compatibility alias.
 
 ## Sequence
 
@@ -15,6 +15,13 @@ The current frontend remains `blocksride/client`.
 5. Add client-compatibility routes and payload parity fixes.
 6. Migrate worker loops.
 7. Cut `blocksride/client` over from Go keeper to Next server.
+
+## Route Direction
+
+- keep `rides` as the canonical resource namespace
+- keep `contests` only as a temporary alias for the existing frontend
+- keep synthetic `grids` reads only while the frontend still depends on them
+- do not expose public mutation helpers such as `POST /api/grids/ensure`
 
 ## Migration Strategy
 
@@ -34,7 +41,24 @@ The current frontend remains `blocksride/client`.
 - nonce management
 - settlement/seeding automation
 
-## Technical Stack
+## State and Coordination
+
+- Do not use Redis in `blocksride-next-server`.
+- Keep ephemeral coordination in-process: seeding jobs, worker in-flight locks, recent price cache, and short-lived relay buffers.
+- Put only restart-sensitive or auditable state in Supabase/Postgres.
+- Keep market truth on-chain.
+
+## Admin Route Protection
+
+For `/api/admin/seeding/*` and similar routes:
+- require backend session auth derived from Privy
+- require server-side admin allowlist via `ADMIN_USER_IDS`
+- prefer wallet/user allowlists over client-visible flags
+- add strict `Origin` validation for admin mutations
+- optionally gate high-risk mutations behind a second admin secret header in production
+- write audit logs for every admin action
+- add basic rate limiting to mutation endpoints
+
 
 - Next.js route handlers
 - TypeScript

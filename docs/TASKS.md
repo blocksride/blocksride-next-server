@@ -32,6 +32,18 @@
 - [x] Add `/api/auth/logout`
 - [x] Fix `/api/relay/claim` payload compatibility with current client
 
+## State Model
+- [x] Remove Redis from the Next server design
+- [x] Use in-app state for seeding coordination and worker locks
+- [ ] Persist only restart-sensitive admin/job state in Supabase if needed later
+
+## Admin Route Hardening
+- [x] Protect admin seeding routes with authenticated admin session checks
+- [ ] Add `Origin` validation on admin mutation routes
+- [ ] Add optional second-factor admin secret for production mutations
+- [ ] Add audit logging for admin seeding actions
+- [ ] Add rate limiting for admin mutation routes
+
 ## Relay Hardening
 - [ ] Implement signer nonce manager
 - [ ] Add typed error mapping
@@ -45,9 +57,10 @@
 - [x] Migrate automatic payout pushing (`pushPayouts`)
 
 ## Deferred / Legacy Surfaces
-- [x] Add synthetic `/api/grids/*` compatibility routes - fetched onchain? is that what is happening or do we have the grid set in the .env
+- [x] Add read-only `/api/grids/*` compatibility routes for transition only
+- [x] Remove `POST /api/grids/ensure` from the Next server surface
 - [x] Add `/api/prices/:assetId` compatibility route
-- [x] Add no-op `/api/analytics/miniapp` compatibility route - should be under admin
+- [ ] Replace no-op `/api/analytics/miniapp` with admin analytics surfaces
 - [x] Add minimal practice-only `/api/positions` compatibility route -
-- [x] Add `/api/trading-pairs` compatibility route - current pair is ETHUSDC
+- [x] Add `/api/trading-pairs` compatibility route - current pair is ETH-USDC
 - [ ] Retire chat websocket support. share telegram group link

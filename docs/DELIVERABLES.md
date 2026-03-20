@@ -19,12 +19,13 @@
 
 ## Phase 4
 - client compatibility layer for the existing Vite frontend
-- `contests` aliases
+- `contests` aliases only for transition; `rides` remains canonical
 - `pools` route
 - `wallet/permit-info` route
 - `users/profile` route
 - `auth/logout` route
 - claim payload parity
+- no public `grids/ensure` mutation route
 
 ## Phase 5
 - price refresh worker
@@ -48,3 +49,13 @@
 - Seeding worker can process admin-armed windows, center keeper bets around the live price, and expose arm/disarm/status routes under `/api/admin/seeding/*`.
 
 - Payout-push worker can scan winning-cell bettors for settled windows and batch `pushPayouts(...)` calls while deduplicating already-pushed winners from on-chain logs.
+
+## Operational Model
+- no Redis dependency in the Next server runtime
+- in-app memory used for ephemeral coordination and caches
+- Supabase/Postgres reserved for durable state only when restart safety or auditability is required
+
+## Admin Security Deliverables
+- server-side admin gating for `/api/admin/*`
+- admin allowlist using backend session identity
+- documented path for `Origin` checks, optional second-factor secret, audit logs, and rate limiting
