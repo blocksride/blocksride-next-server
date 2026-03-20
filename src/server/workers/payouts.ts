@@ -39,7 +39,7 @@ export async function startPayoutPushWorker(intervalMs: number): Promise<PayoutP
   const account = getKeeperAccount().address;
 
   if (!payoutPushTimer) {
-    await pushReadyPayouts();
+    void pushReadyPayouts();
     payoutPushTimer = setInterval(() => {
       void pushReadyPayouts();
     }, intervalMs);
