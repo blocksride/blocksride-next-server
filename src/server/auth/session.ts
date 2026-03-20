@@ -62,7 +62,8 @@ export function getSessionCookieOptions() {
     name: AUTH_COOKIE_NAME,
     httpOnly: true,
     secure,
-    sameSite: secure ? ("strict" as const) : ("lax" as const),
+    // SameSite=none required for cross-origin requests (client and server on different domains)
+    sameSite: secure ? ("none" as const) : ("lax" as const),
     path: "/",
     maxAge: DEFAULT_MAX_AGE_SECONDS
   };
