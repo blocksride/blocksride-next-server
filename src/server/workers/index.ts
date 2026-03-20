@@ -1,12 +1,14 @@
 import { env } from "@/server/config/env";
 import { startPriceRefreshWorker, type PriceRefreshWorkerStatus } from "@/server/workers/priceRefresh";
 import { startSettlementWorker, type SettlementWorkerStatus } from "@/server/workers/settlement";
+import { startPayoutPushWorker, type PayoutPushWorkerStatus } from "@/server/workers/payouts";
 import { startSeedingWorker, type SeedingWorkerStatus } from "@/server/workers/seeding";
 
 export type WorkerStatus =
   | PriceRefreshWorkerStatus
   | SettlementWorkerStatus
   | SeedingWorkerStatus
+  | PayoutPushWorkerStatus
   | { name: "price-refresh"; enabled: false; reason: string };
 
 let startPromise: Promise<{ started: boolean; workers: WorkerStatus[] }> | null = null;
@@ -23,7 +25,8 @@ export async function startWorkers() {
         workers: [
           { name: "price-refresh", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" },
           { name: "settlement", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" },
-          { name: "seeding", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" }
+          { name: "seeding", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" },
+          { name: "payout-push", enabled: false, reason: "ENABLE_INTERNAL_WORKERS=false" }
         ] satisfies WorkerStatus[]
       };
     }
@@ -38,6 +41,7 @@ export async function startWorkers() {
 
     workers.push(await startSettlementWorker(env.SETTLEMENT_POLL_INTERVAL_MS));
     workers.push(await startSeedingWorker(env.SEEDING_POLL_INTERVAL_MS));
+    workers.push(await startPayoutPushWorker(env.PAYOUT_PUSH_POLL_INTERVAL_MS));
 
     return {
       started: true,

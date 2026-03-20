@@ -30,7 +30,11 @@ const envSchema = z.object({
   SEEDING_WORKER_ENABLED: z.coerce.boolean().default(false),
   SEEDING_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   SEEDING_DEFAULT_RANGE: z.coerce.number().int().positive().default(10),
-  SEED_AMOUNT_USDC: z.string().default("10000")
+  SEED_AMOUNT_USDC: z.string().default("10000"),
+  PAYOUT_PUSH_WORKER_ENABLED: z.coerce.boolean().default(false),
+  PAYOUT_PUSH_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
+  PAYOUT_PUSH_LOOKBACK_WINDOWS: z.coerce.number().int().nonnegative().default(5),
+  PAYOUT_PUSH_MAX_WINNERS_PER_TX: z.coerce.number().int().positive().default(50)
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

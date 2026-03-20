@@ -42,12 +42,12 @@
 - [x] Admin seeding helpers
 
 ## Remaining Worker Gaps
-- [ ] Decide whether to migrate automatic payout pushing (`pushPayouts`)
+- [x] Migrate automatic payout pushing (`pushPayouts`)
 
 ## Deferred / Legacy Surfaces
-- [x] Add synthetic `/api/grids/*` compatibility routes
+- [x] Add synthetic `/api/grids/*` compatibility routes - fetched onchain? is that what is happening or do we have the grid set in the .env
 - [x] Add `/api/prices/:assetId` compatibility route
-- [x] Add no-op `/api/analytics/miniapp` compatibility route
-- [x] Add minimal practice-only `/api/positions` compatibility route
-- [x] Add `/api/trading-pairs` compatibility route
-- [ ] Decide whether to keep or retire chat websocket support
+- [x] Add no-op `/api/analytics/miniapp` compatibility route - should be under admin
+- [x] Add minimal practice-only `/api/positions` compatibility route -
+- [x] Add `/api/trading-pairs` compatibility route - current pair is ETHUSDC
+- [ ] Retire chat websocket support. share telegram group link

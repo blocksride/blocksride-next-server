@@ -30,6 +30,7 @@
 - price refresh worker
 - settlement worker
 - seeding worker
+- payout-push worker
 - admin seeding helpers
 
 ## Definition of Done
@@ -45,3 +46,5 @@
 - Settlement worker polls configured pools, detects unsettled closed windows, fetches Hermes price updates, and submits `PariHook.settle(...)` transactions when enabled.
 
 - Seeding worker can process admin-armed windows, center keeper bets around the live price, and expose arm/disarm/status routes under `/api/admin/seeding/*`.
+
+- Payout-push worker can scan winning-cell bettors for settled windows and batch `pushPayouts(...)` calls while deduplicating already-pushed winners from on-chain logs.

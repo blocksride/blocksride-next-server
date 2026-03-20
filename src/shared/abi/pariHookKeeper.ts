@@ -1,3 +1,5 @@
+import { parseAbiItem } from "viem";
+
 export const poolKeyAbi = {
   name: "poolKey",
   type: "tuple",
@@ -61,8 +63,23 @@ export const pariHookKeeperAbi = [
     stateMutability: "payable",
     inputs: [poolKeyAbi, { name: "windowId", type: "uint256" }, { name: "pythUpdateData", type: "bytes" }],
     outputs: []
+  },
+  {
+    type: "function",
+    name: "pushPayouts",
+    stateMutability: "nonpayable",
+    inputs: [poolKeyAbi, { name: "windowId", type: "uint256" }, { name: "winners", type: "address[]" }],
+    outputs: []
   }
 ] as const;
+
+export const betPlacedEvent = parseAbiItem(
+  "event BetPlaced(bytes32 indexed poolId, uint256 indexed windowId, uint256 indexed cellId, address bettor, uint256 amount)"
+);
+
+export const payoutPushedEvent = parseAbiItem(
+  "event PayoutPushed(bytes32 indexed poolId, uint256 indexed windowId, address indexed winner, uint256 amount)"
+);
 
 export const pythFeeAbi = [
   {

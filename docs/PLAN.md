@@ -56,9 +56,10 @@ The current frontend remains `blocksride/client`.
 - internal price-refresh worker bootstrap implemented
 - initial on-chain settlement worker implemented using Hermes + `PariHook.settle(...)`
 - initial seeding worker and admin seeding routes implemented
+- initial payout-push worker implemented
 
 ## Immediate Next Work
 
-- decide whether automatic payout pushing should be migrated or whether claim-only is sufficient
+- automatic payout pushing is now migrated into the Next worker runtime
 - decide whether chat websocket support should be migrated or retired
 - add relay hardening for signer nonce management and typed error mapping

@@ -39,9 +39,10 @@ This migration is about replacing the Go keeper behind that frontend. Do not por
 - internal price-refresh worker migrated
 - initial Hermes-backed settlement worker migrated
 - initial in-memory seeding/admin worker flow migrated
+- automatic payout-push worker migrated
 
 ## Next Required Steps
 
-- decide whether automatic payout pushing should be migrated
+- payout pushing has been migrated into the Next worker runtime
 - review whether chat websocket support should be migrated or retired
 - harden relay + worker error handling and nonce policy

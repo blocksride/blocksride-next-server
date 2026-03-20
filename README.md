@@ -16,13 +16,13 @@ This project is not a second frontend and should not duplicate the Vite app unle
 
 - Route handlers for auth, relay, contests/rides, leaderboard, pools, wallet metadata, and public price data
 - Shared server modules for viem, Supabase, Privy, and relay logic
-- Internal worker modules for settlement, seeding, and price refresh jobs
+- Internal worker modules for settlement, seeding, payout pushing, and price refresh jobs
 - Compatibility with the current request surface used by `blocksride/client`
 - Next instrumentation hook to start internal workers in the same server process when enabled
 
 ## Status
 
-This folder is the backend migration target and planning workspace. Core API compatibility for the current client is largely in place; the main remaining frontend-facing gap is chat websocket support, and the main backend gaps are payout-push automation and relay hardening.
+This folder is the backend migration target and planning workspace. Core API compatibility for the current client is largely in place; the main remaining frontend-facing gap is chat websocket support, and the main backend gap is relay hardening.
 
 ## Planned Structure
 
@@ -44,6 +44,7 @@ This folder is the backend migration target and planning workspace. Core API com
 - Internal price-refresh worker bootstrap via `src/instrumentation.ts` and `src/server/workers/priceRefresh.ts`
 - Initial on-chain settlement worker using Hermes + `PariHook.settle(...)` via `src/server/workers/settlement.ts`
 - Initial seeding worker plus admin seeding routes via `src/server/workers/seeding.ts` and `/api/admin/seeding/*`
+- Initial payout-push worker via `src/server/workers/payouts.ts` to batch `pushPayouts(...)` calls for settled winning windows
 - Compatibility routes for `contests`, `pools`, `wallet/permit-info`, `users/profile`, `auth/logout`, `grids`, `prices`, `positions`, `leaderboard`, `trading-pairs`, and `user/stats`
 
 ## Current Compatibility Gaps
@@ -52,5 +53,4 @@ Frontend-facing compatibility is mostly covered.
 
 Remaining gaps:
 - chat websocket support (`/api/chat/ws`) if the existing chat UI is still meant to be kept
-- payout-push worker if auto-payout batching is still desired
 - relay hardening around signer nonce management and typed error mapping
