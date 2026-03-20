@@ -32,6 +32,7 @@ const envSchema = z.object({
   PRIVY_APP_SECRET: z.string().optional(),
   JWT_SECRET: z.string().optional(),
   ADMIN_USER_IDS: z.string().optional(),
+  ADMIN_SECRET: z.string().optional(),
   ENABLE_INTERNAL_WORKERS: booleanEnv(false),
   PRICE_REFRESH_ENABLED: booleanEnv(true),
   PRICE_REFRESH_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
