@@ -1,4 +1,5 @@
 import { env } from "@/server/config/env";
+import { getKeeperPools } from "@/server/config/pools";
 import type { LeaderboardEntry, Ride } from "@/shared/rides";
 
 export type UserProfile = {
@@ -10,6 +11,84 @@ export type UserProfile = {
 };
 
 const REST_BASE_PATH = "/rest/v1";
+
+const profileFallbacks = new Map<string, UserProfile>();
+
+function getFallbackProfile(userId: string): UserProfile | null {
+  return profileFallbacks.get(userId) ?? null;
+}
+
+function setFallbackProfile(profile: UserProfile): void {
+  profileFallbacks.set(profile.user_id, profile);
+}
+
+function mergeProfiles(primary: UserProfile | null, fallback: UserProfile | null): UserProfile | null {
+  if (!primary && !fallback) return null;
+  if (!primary) return fallback;
+  if (!fallback) return primary;
+
+  return {
+    ...primary,
+    ...fallback,
+    onboarding_completed: fallback.onboarding_completed || primary.onboarding_completed,
+  };
+}
+
+function syntheticContestId(assetId: string): string {
+  return `${assetId.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-live`;
+}
+
+function toSyntheticRide(pool: ReturnType<typeof getKeeperPools>[number], status: string): Ride {
+  const startTime = new Date(pool.gridEpoch * 1000).toISOString();
+  const endTime = new Date(Math.max(Date.now(), pool.gridEpoch * 1000) + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  return {
+    contest_id: syntheticContestId(pool.assetId),
+    name: pool.name ?? pool.assetId,
+    description: `${pool.assetId} ride`,
+    asset_id: pool.assetId,
+    grid_id: `${pool.assetId}-live`,
+    start_time: startTime,
+    end_time: endTime,
+    status,
+    price_interval: 2,
+    timeframe_sec: pool.windowDurationSec,
+    bands_above: 12,
+    bands_below: 12,
+    frozen_windows: 2,
+    created_at: startTime,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function getActiveSyntheticRide(): Ride | null {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const pool = getKeeperPools()
+    .filter((item) => item.gridEpoch <= nowSec)
+    .sort((a, b) => b.gridEpoch - a.gridEpoch)[0] ?? getKeeperPools()[0] ?? null;
+  return pool ? toSyntheticRide(pool, "active") : null;
+}
+
+function getUpcomingSyntheticRides(limit = 10): Ride[] {
+  const nowSec = Math.floor(Date.now() / 1000);
+  return getKeeperPools()
+    .filter((item) => item.gridEpoch > nowSec)
+    .sort((a, b) => a.gridEpoch - b.gridEpoch)
+    .slice(0, limit)
+    .map((pool) => toSyntheticRide(pool, "upcoming"));
+}
+
+function getSyntheticRideById(rideId: string): Ride | null {
+  const lower = rideId.toLowerCase();
+  const pool = getKeeperPools().find((item) => {
+    const syntheticId = syntheticContestId(item.assetId);
+    return syntheticId === lower || item.assetId.toLowerCase() === lower || item.poolId.toLowerCase() === lower;
+  }) ?? null;
+
+  if (!pool) return null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  return toSyntheticRide(pool, pool.gridEpoch > nowSec ? "upcoming" : "active");
+}
 
 function getRequiredSupabaseConfig() {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -48,12 +127,20 @@ async function supabaseRequest<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export async function getActiveRide(): Promise<Ride | null> {
-  const rides = await supabaseRequest<Ride[]>("/contests?status=eq.active&order=start_time.asc&limit=1");
-  return rides[0] ?? null;
+  try {
+    const rides = await supabaseRequest<Ride[]>("/contests?status=eq.active&order=start_time.asc&limit=1");
+    return rides[0] ?? null;
+  } catch {
+    return getActiveSyntheticRide();
+  }
 }
 
 export async function getUpcomingRides(limit = 10): Promise<Ride[]> {
-  return supabaseRequest<Ride[]>(`/contests?status=eq.upcoming&order=start_time.asc&limit=${limit}`);
+  try {
+    return await supabaseRequest<Ride[]>(`/contests?status=eq.upcoming&order=start_time.asc&limit=${limit}`);
+  } catch {
+    return getUpcomingSyntheticRides(limit);
+  }
 }
 
 export async function getRideById(rideId: string): Promise<Ride | null> {
@@ -61,8 +148,12 @@ export async function getRideById(rideId: string): Promise<Ride | null> {
     return null;
   }
 
-  const rides = await supabaseRequest<Ride[]>(`/contests?contest_id=eq.${encodeURIComponent(rideId)}&limit=1`);
-  return rides[0] ?? null;
+  try {
+    const rides = await supabaseRequest<Ride[]>(`/contests?contest_id=eq.${encodeURIComponent(rideId)}&limit=1`);
+    return rides[0] ?? null;
+  } catch {
+    return getSyntheticRideById(rideId);
+  }
 }
 
 export async function getRideLeaderboard(rideId: string, limit = 10): Promise<LeaderboardEntry[]> {
@@ -70,32 +161,65 @@ export async function getRideLeaderboard(rideId: string, limit = 10): Promise<Le
     return [];
   }
 
-  return supabaseRequest<LeaderboardEntry[]>(
-    `/leaderboard_entries?contest_id=eq.${encodeURIComponent(rideId)}&order=rank.asc&limit=${limit}`
-  );
+  try {
+    return await supabaseRequest<LeaderboardEntry[]>(
+      `/leaderboard_entries?contest_id=eq.${encodeURIComponent(rideId)}&order=rank.asc&limit=${limit}`
+    );
+  } catch {
+    return [];
+  }
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  const profiles = await supabaseRequest<UserProfile[]>(`/user_profiles?user_id=eq.${encodeURIComponent(userId)}&limit=1`);
-  return profiles[0] ?? null;
+  const fallback = getFallbackProfile(userId);
+
+  try {
+    const profiles = await supabaseRequest<UserProfile[]>(`/user_profiles?user_id=eq.${encodeURIComponent(userId)}&limit=1`);
+    return mergeProfiles(profiles[0] ?? null, fallback);
+  } catch {
+    return fallback;
+  }
 }
 
 export async function upsertUserProfile(profile: UserProfile): Promise<void> {
-  await supabaseRequest<void>("/user_profiles?on_conflict=user_id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal"
-    },
-    body: JSON.stringify([profile])
-  });
+  setFallbackProfile(profile);
+
+  try {
+    await supabaseRequest<void>("/user_profiles?on_conflict=user_id", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal"
+      },
+      body: JSON.stringify([profile])
+    });
+  } catch {
+    // Keep in-memory fallback when Supabase is unreachable.
+  }
 }
 
 export async function markOnboardingComplete(userId: string): Promise<void> {
-  await supabaseRequest<void>(`/user_profiles?user_id=eq.${encodeURIComponent(userId)}`, {
-    method: "PATCH",
-    headers: {
-      Prefer: "return=minimal"
-    },
-    body: JSON.stringify({ onboarding_completed: true })
+  const fallback = getFallbackProfile(userId) ?? {
+    user_id: userId,
+    email: null,
+    wallet_address: userId,
+    nickname: null,
+    onboarding_completed: false,
+  };
+
+  setFallbackProfile({
+    ...fallback,
+    onboarding_completed: true,
   });
+
+  try {
+    await supabaseRequest<void>(`/user_profiles?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify({ onboarding_completed: true })
+    });
+  } catch {
+    // Keep in-memory onboarding state when Supabase is unreachable.
+  }
 }
