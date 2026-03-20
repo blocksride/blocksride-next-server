@@ -8,6 +8,11 @@ export async function register() {
   }
 
   bootstrapped = true;
-  const result = await startWorkers();
-  console.log("[instrumentation] worker startup", result);
+  void startWorkers()
+    .then((result) => {
+      console.log("[instrumentation] worker startup", result);
+    })
+    .catch((error) => {
+      console.error("[instrumentation] worker startup failed", error);
+    });
 }

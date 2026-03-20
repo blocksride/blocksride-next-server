@@ -22,7 +22,7 @@ export async function startPriceRefreshWorker(intervalMs: number): Promise<Price
     };
   }
 
-  await refreshAllPublicPrices(assets);
+  void refreshAllPublicPrices(assets);
 
   priceRefreshTimer = setInterval(() => {
     void refreshAllPublicPrices(assets);
