@@ -17,6 +17,7 @@ import { env } from "@/server/config/env";
 import { getPublicClient, getRelayerAccount, getWalletClient } from "@/server/chain/client";
 import { usdcAbi } from "@/shared/abi/usdc";
 import { pariHookWriteAbi } from "@/shared/abi/pariHookWrite";
+import { saveBetRecord, updateBetRecord } from "@/server/supabase/bets";
 
 const EIP712_DOMAIN_NAME = "PariHook";
 const EIP712_DOMAIN_VERSION = "1";
@@ -170,6 +171,20 @@ export async function validateBetIntent(intent: BetIntent): Promise<void> {
 export async function scheduleBet(intent: BetIntent, submitAfterMs = 3000): Promise<{ intentId: string; submitAfter: number }> {
   const intentId = randomUUID();
   const submitAfter = Date.now() + submitAfterMs;
+
+  // Persist bet immediately so it can be tracked even if the server restarts
+  void saveBetRecord({
+    intent_id: intentId,
+    wallet_address: intent.signer.toLowerCase(),
+    pool_id: intent.poolId,
+    pool_key: intent.poolKey,
+    window_id: intent.windowId.toString(),
+    cell_id: intent.cellId.toString(),
+    amount: intent.amount.toString(),
+    state: "pending",
+    created_at: new Date().toISOString()
+  });
+
   const timeout = setTimeout(async () => {
     const pending = pendingBets.get(intentId);
     if (!pending) return;
@@ -178,10 +193,12 @@ export async function scheduleBet(intent: BetIntent, submitAfterMs = 3000): Prom
     try {
       const result = await submitBet(pending.intent);
       betStatuses.set(intentId, { state: "confirmed", ...result });
+      void updateBetRecord(intentId, { state: "confirmed", tx_hash: result.betTxHash });
     } catch (error) {
       const message = error instanceof Error ? error.message : "submission failed";
       console.error("[relay] bet submission failed", { intentId, error });
       betStatuses.set(intentId, { state: "failed", error: message });
+      void updateBetRecord(intentId, { state: "pending" }); // keep as pending to retry later
     }
   }, submitAfterMs);
 

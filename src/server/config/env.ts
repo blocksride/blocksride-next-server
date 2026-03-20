@@ -46,7 +46,9 @@ const envSchema = z.object({
   PAYOUT_PUSH_WORKER_ENABLED: booleanEnv(false),
   PAYOUT_PUSH_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   PAYOUT_PUSH_LOOKBACK_WINDOWS: z.coerce.number().int().nonnegative().default(5),
-  PAYOUT_PUSH_MAX_WINNERS_PER_TX: z.coerce.number().int().positive().default(50)
+  PAYOUT_PUSH_MAX_WINNERS_PER_TX: z.coerce.number().int().positive().default(50),
+  BET_SETTLEMENT_WORKER_ENABLED: booleanEnv(true),
+  BET_SETTLEMENT_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(15000)
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
