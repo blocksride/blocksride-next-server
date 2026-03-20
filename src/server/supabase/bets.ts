@@ -19,8 +19,13 @@ export type BetRecord = {
   updated_at?: string;
 };
 
-// In-memory fallback when Supabase is unavailable
-const inMemoryBets = new Map<string, BetRecord>();
+// In-memory fallback when Supabase is unavailable.
+// Use globalThis so all Next.js route bundles share the same Map within one Node.js process.
+declare global {
+  // eslint-disable-next-line no-var
+  var __inMemoryBets: Map<string, BetRecord> | undefined;
+}
+const inMemoryBets: Map<string, BetRecord> = (globalThis.__inMemoryBets ??= new Map());
 
 function getRequiredConfig() {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
