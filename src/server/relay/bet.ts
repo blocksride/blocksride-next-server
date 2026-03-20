@@ -27,6 +27,12 @@ const BET_INTENT_TYPEHASH = keccak256(
   stringToHex("BetIntent(address user,bytes32 poolId,uint256 cellId,uint256 windowId,uint256 amount,uint256 nonce,uint256 deadline)")
 );
 
+type BetStatus =
+  | { state: "pending"; submitAfter: number }
+  | { state: "submitting" }
+  | { state: "confirmed"; permitTxHash?: Hex; betTxHash: Hex }
+  | { state: "failed"; error: string };
+
 type PendingBet = {
   intentId: string;
   intent: BetIntent;
@@ -34,7 +40,23 @@ type PendingBet = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
-const pendingBets = new Map<string, PendingBet>();
+// Store on globalThis so all Next.js route bundles share the same instance
+// within a single Node.js process (dev server + non-serverless prod).
+declare global {
+  // eslint-disable-next-line no-var
+  var __pendingBets: Map<string, PendingBet> | undefined;
+  // eslint-disable-next-line no-var
+  var __betStatuses: Map<string, BetStatus> | undefined;
+}
+
+const pendingBets: Map<string, PendingBet> = (globalThis.__pendingBets ??= new Map());
+const betStatuses: Map<string, BetStatus> = (globalThis.__betStatuses ??= new Map());
+
+export function getBetStatus(intentId: string): BetStatus | null {
+  const pending = pendingBets.get(intentId);
+  if (pending) return { state: "pending", submitAfter: Math.floor(pending.submitAfter / 1000) };
+  return betStatuses.get(intentId) ?? null;
+}
 
 function getHookAddress(): `0x${string}` {
   const address = env.PARIHOOK_CONTRACT_ADDRESS;
@@ -150,14 +172,16 @@ export async function scheduleBet(intent: BetIntent, submitAfterMs = 3000): Prom
   const submitAfter = Date.now() + submitAfterMs;
   const timeout = setTimeout(async () => {
     const pending = pendingBets.get(intentId);
-    if (!pending) {
-      return;
-    }
+    if (!pending) return;
     pendingBets.delete(intentId);
+    betStatuses.set(intentId, { state: "submitting" });
     try {
-      await submitBet(pending.intent);
+      const result = await submitBet(pending.intent);
+      betStatuses.set(intentId, { state: "confirmed", ...result });
     } catch (error) {
-      console.error("[relay] bet submission failed", error);
+      const message = error instanceof Error ? error.message : "submission failed";
+      console.error("[relay] bet submission failed", { intentId, error });
+      betStatuses.set(intentId, { state: "failed", error: message });
     }
   }, submitAfterMs);
 
@@ -211,36 +235,39 @@ async function simulateBetWithSig(intent: BetIntent): Promise<void> {
   });
 }
 
-async function submitBet(intent: BetIntent): Promise<void> {
+async function submitBet(intent: BetIntent): Promise<{ permitTxHash?: Hex; betTxHash: Hex }> {
   const walletClient = getWalletClient();
   const publicClient = getPublicClient();
   const account = getRelayerAccount();
   const hookAddress = getHookAddress();
   const allowance = await getUserAllowanceForSpender(intent.signer, hookAddress);
 
+  let permitTxHash: Hex | undefined;
   if (allowance < intent.amount) {
     if (!intent.permit) {
       throw new Error("hook allowance is insufficient and no permit was provided");
     }
 
-    const permitHash = await walletClient.writeContract({
+    permitTxHash = await walletClient.writeContract({
       account,
       address: getUsdcAddress(),
       abi: usdcAbi,
       functionName: "permit",
       args: [intent.signer, hookAddress, intent.permit.value, intent.permit.deadline, intent.permit.v, intent.permit.r, intent.permit.s]
     });
-    await publicClient.waitForTransactionReceipt({ hash: permitHash });
+    await publicClient.waitForTransactionReceipt({ hash: permitTxHash });
   }
 
-  const betHash = await walletClient.writeContract({
+  const betTxHash = await walletClient.writeContract({
     account,
     address: hookAddress,
     abi: pariHookWriteAbi,
     functionName: "placeBetWithSig",
     args: [toAbiPoolKey(intent.poolKey), intent.cellId, intent.windowId, intent.amount, intent.signer, intent.nonce, intent.deadline, intent.signature]
   });
-  await publicClient.waitForTransactionReceipt({ hash: betHash });
+  await publicClient.waitForTransactionReceipt({ hash: betTxHash });
+
+  return { permitTxHash, betTxHash };
 }
 
 function computePoolId(poolKey: PoolKeyInput): `0x${string}` {

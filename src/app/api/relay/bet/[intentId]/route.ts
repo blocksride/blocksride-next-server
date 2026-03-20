@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { cancelBet } from "@/server/relay/bet";
+import { requireSession } from "@/server/auth/request";
+import { cancelBet, getBetStatus } from "@/server/relay/bet";
 
 export const runtime = "nodejs";
 
@@ -10,10 +11,25 @@ type Params = {
   }>;
 };
 
-export async function DELETE(_: Request, { params }: Params) {
-  const { intentId } = await params;
-
+export async function GET(request: Request, { params }: Params) {
   try {
+    requireSession(request);
+    const { intentId } = await params;
+    const status = getBetStatus(intentId);
+    if (!status) {
+      return NextResponse.json({ error: "intent not found" }, { status: 404 });
+    }
+    return NextResponse.json(status);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "failed to get status";
+    return NextResponse.json({ error: message }, { status: message === "Unauthorized" ? 401 : 400 });
+  }
+}
+
+export async function DELETE(request: Request, { params }: Params) {
+  try {
+    requireSession(request);
+    const { intentId } = await params;
     cancelBet(intentId);
     return NextResponse.json({ cancelled: true });
   } catch (error) {

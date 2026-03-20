@@ -29,13 +29,12 @@ export async function getPermitInfo(address: string) {
   const user = getAddress(address);
   const publicClient = getPublicClient();
   const tokenAddress = getTokenAddress();
-  const nonce = await publicClient.readContract({
-    address: tokenAddress,
-    abi: usdcAbi,
-    functionName: "nonces",
-    args: [user]
-  });
-  const chainId = await publicClient.getChainId();
+  const [nonce, domainName, domainVersion, chainId] = await Promise.all([
+    publicClient.readContract({ address: tokenAddress, abi: usdcAbi, functionName: "nonces", args: [user] }),
+    publicClient.readContract({ address: tokenAddress, abi: usdcAbi, functionName: "name" }),
+    publicClient.readContract({ address: tokenAddress, abi: usdcAbi, functionName: "version" }),
+    publicClient.getChainId(),
+  ]);
 
   const spenderAddress = getSpenderAddress();
 
@@ -44,6 +43,8 @@ export async function getPermitInfo(address: string) {
     tokenAddress,
     chainId: String(chainId),
     spenderAddress,
-    hookAddress: spenderAddress
+    hookAddress: spenderAddress,
+    domainName,
+    domainVersion,
   };
 }
