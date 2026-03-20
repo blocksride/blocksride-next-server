@@ -33,7 +33,7 @@ export async function startSeedingWorker(intervalMs: number): Promise<SeedingWor
   }
 
   if (!seedingTimer) {
-    await seedArmedWindows();
+    void seedArmedWindows();
     seedingTimer = setInterval(() => {
       void seedArmedWindows();
     }, intervalMs);

@@ -39,7 +39,7 @@ export async function startSettlementWorker(intervalMs: number): Promise<Settlem
   const account = getKeeperAccount().address;
 
   if (!settlementTimer) {
-    await settleReadyWindows();
+    void settleReadyWindows();
     settlementTimer = setInterval(() => {
       void settleReadyWindows();
     }, intervalMs);
