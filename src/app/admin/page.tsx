@@ -1,12 +1,14 @@
-"use server";
-
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAddress } from "viem";
 
 import { getKeeperPools } from "@/server/config/pools";
 import { getSeedingStatus } from "@/server/seeding/state";
 import { env } from "@/server/config/env";
 import type { BetRecord } from "@/server/supabase/bets";
+import { getPublicClient } from "@/server/chain/client";
+import { getPublicPrice, isSupportedPublicPriceAsset } from "@/server/market-data/publicPrice";
+import { pariHookKeeperAbi } from "@/shared/abi/pariHookKeeper";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +60,90 @@ function getRecentBets(limit = 20): BetRecord[] {
     .slice(0, limit) as BetRecord[];
 }
 
+type SeedCell = {
+  id: number;
+  low: string;
+  high: string;
+  isCenter: boolean;
+};
+
+type SeedData = {
+  poolId: string;
+  poolName: string;
+  assetId: string;
+  price: number;
+  centerCell: number;
+  bandWidth: number;
+  cells: SeedCell[];
+  currentWindowId: number;
+  frozenWindows: number;
+  windowDurationSec: number;
+  defaultAmountUsdc: string;
+} | null;
+
+async function getAdminSeedData(): Promise<SeedData> {
+  const pools = getKeeperPools();
+  const pool = pools[0];
+  if (!pool || !isSupportedPublicPriceAsset(pool.assetId)) return null;
+
+  try {
+    const hookAddress = getAddress(pool.poolKey.hooks);
+    const publicClient = getPublicClient();
+
+    const [priceResult, config, currentWindowId] = await Promise.all([
+      getPublicPrice(pool.assetId),
+      publicClient.readContract({
+        address: hookAddress,
+        abi: pariHookKeeperAbi,
+        functionName: "gridConfigs",
+        args: [pool.poolId as `0x${string}`]
+      }),
+      publicClient.readContract({
+        address: hookAddress,
+        abi: pariHookKeeperAbi,
+        functionName: "currentWindowId",
+        args: [pool.poolKey]
+      })
+    ]);
+
+    const bandWidth = Number(config[1]);
+    if (bandWidth <= 0) return null;
+
+    const price = priceResult.price;
+    const centerCell = Math.floor((price * 1_000_000) / bandWidth);
+    const RANGE = 10;
+    const cells: SeedCell[] = [];
+
+    // High prices at top, descending
+    for (let i = centerCell + RANGE - 1; i >= centerCell - RANGE; i--) {
+      const low = (i * bandWidth) / 1_000_000;
+      const high = ((i + 1) * bandWidth) / 1_000_000;
+      cells.push({
+        id: i,
+        low: low.toFixed(2),
+        high: high.toFixed(2),
+        isCenter: i === centerCell,
+      });
+    }
+
+    return {
+      poolId: pool.poolId,
+      poolName: pool.name ?? pool.assetId,
+      assetId: pool.assetId,
+      price,
+      centerCell,
+      bandWidth,
+      cells,
+      currentWindowId: Number(currentWindowId),
+      frozenWindows: Number(config[3]),
+      windowDurationSec: pool.windowDurationSec,
+      defaultAmountUsdc: (Number(env.SEED_AMOUNT_USDC) / 1_000_000).toFixed(2),
+    };
+  } catch {
+    return null;
+  }
+}
+
 const STATE_COLORS: Record<string, string> = {
   pending: "#f59e0b",
   confirmed: "#3b82f6",
@@ -96,24 +182,38 @@ const css = `
   input[type=password]:focus { outline: none; border-color: #f5a623; }
   .submit { width: 100%; background: #f5a623; color: #000; font-weight: 700; padding: 8px; border: none; }
   .submit:hover { background: #e09410; }
+  .seed-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+  .seed-cell { background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 4px; padding: 6px 8px; cursor: pointer; user-select: none; transition: border-color 0.1s; }
+  .seed-cell:hover { border-color: #444; }
+  .seed-cell.center { border-color: #22c55e40; background: #14532d20; }
+  .seed-cell.selected { border-color: #f5a623 !important; background: #451a0330; }
+  .seed-cell .price { font-size: 11px; color: #aaa; }
+  .seed-cell .cell-id { font-size: 10px; color: #444; margin-top: 2px; }
+  .seed-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .seed-controls label { color: #555; font-size: 11px; }
+  input[type=number], input[type=text] { background: #0a0a0a; border: 1px solid #2a2a2a; border-radius: 4px; color: #e5e5e5; font-family: inherit; font-size: 12px; padding: 4px 8px; width: 90px; }
+  input[type=number]:focus, input[type=text]:focus { outline: none; border-color: #f5a623; }
+  .seed-windows { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .win-btn { font-size: 11px; padding: 3px 10px; }
+  .win-btn.active { background: #1a1a0a; border-color: #f5a623; color: #f5a623; }
+  .seed-btn-row { display: flex; gap: 8px; align-items: center; }
+  #seed-status { font-size: 12px; color: #555; }
 `;
 
 function LoginPage() {
   return (
-    <html lang="en">
-      <head><title>Admin Login</title><style>{css}</style></head>
-      <body>
-        <div className="login-wrap">
-          <div className="login-box">
-            <h1>Admin</h1>
-            <form action={loginAction}>
-              <input type="password" name="password" placeholder="Admin secret" autoFocus />
-              <button type="submit" className="submit">Enter</button>
-            </form>
-          </div>
+    <>
+      <style>{css}</style>
+      <div className="login-wrap">
+        <div className="login-box">
+          <h1>Admin</h1>
+          <form action={loginAction}>
+            <input type="password" name="password" placeholder="Admin secret" autoFocus />
+            <button type="submit" className="submit">Enter</button>
+          </form>
         </div>
-      </body>
-    </html>
+      </div>
+    </>
   );
 }
 
@@ -126,11 +226,114 @@ export default async function AdminPage() {
   const betCounts = getBetCounts();
   const recentBets = getRecentBets();
   const nowSec = Math.floor(Date.now() / 1000);
+  const seedData = await getAdminSeedData();
+
+  const seedScript = seedData ? `
+    (function() {
+      var selected = new Set();
+      var poolId = ${JSON.stringify(seedData.poolId)};
+      var bandWidth = ${seedData.bandWidth};
+      var assetId = ${JSON.stringify(seedData.assetId)};
+      var selectedWindowId = ${seedData.currentWindowId + seedData.frozenWindows + 1};
+
+      setInterval(async function() {
+        try {
+          var res = await fetch('/api/public-price?asset_id=' + assetId);
+          var data = await res.json();
+          if (!data.price) return;
+          document.getElementById('seed-price').textContent = '$' + parseFloat(data.price).toFixed(2);
+          var newCenter = Math.floor((data.price * 1000000) / bandWidth);
+          document.querySelectorAll('.seed-cell').forEach(function(cell) {
+            var id = parseInt(cell.dataset.cellId);
+            var idEl = cell.querySelector('.cell-id');
+            if (id === newCenter) {
+              cell.classList.add('center');
+              idEl.textContent = 'cell ' + id + ' \u25c0 now';
+            } else {
+              cell.classList.remove('center');
+              idEl.textContent = 'cell ' + id;
+            }
+          });
+        } catch(e) {}
+      }, 10000);
+
+      document.querySelectorAll('.seed-cell').forEach(function(cell) {
+        cell.addEventListener('click', function() {
+          var id = parseInt(cell.dataset.cellId);
+          if (selected.has(id)) {
+            selected.delete(id);
+            cell.classList.remove('selected');
+          } else {
+            selected.add(id);
+            cell.classList.add('selected');
+          }
+          document.getElementById('seed-count').textContent = selected.size + ' cell' + (selected.size !== 1 ? 's' : '') + ' selected';
+        });
+      });
+
+      document.querySelectorAll('.win-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          selectedWindowId = parseInt(btn.dataset.wid);
+          document.querySelectorAll('.win-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+        });
+      });
+
+      document.getElementById('seed-all-btn').addEventListener('click', function() {
+        document.querySelectorAll('.seed-cell').forEach(function(cell) {
+          selected.add(parseInt(cell.dataset.cellId));
+          cell.classList.add('selected');
+        });
+        document.getElementById('seed-count').textContent = selected.size + ' cells selected';
+      });
+
+      document.getElementById('seed-clear-btn').addEventListener('click', function() {
+        selected.clear();
+        document.querySelectorAll('.seed-cell').forEach(function(cell) { cell.classList.remove('selected'); });
+        document.getElementById('seed-count').textContent = '0 cells selected';
+      });
+
+      document.getElementById('seed-submit-btn').addEventListener('click', async function() {
+        if (selected.size === 0) {
+          document.getElementById('seed-status').textContent = 'Select at least one cell.';
+          return;
+        }
+        var amountDollars = parseFloat(document.getElementById('seed-amount').value);
+        if (!amountDollars || amountDollars <= 0) {
+          document.getElementById('seed-status').textContent = 'Enter a valid amount.';
+          return;
+        }
+        var amountUsdc = String(Math.round(amountDollars * 1000000));
+        var cells = Array.from(selected);
+        var btn = document.getElementById('seed-submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'Seeding...';
+        document.getElementById('seed-status').textContent = 'Submitting ' + cells.length + ' cell(s) for window ' + selectedWindowId + '...';
+        try {
+          var res = await fetch('/admin/seed-direct', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ poolId: poolId, windowId: selectedWindowId, cells: cells, amountUsdc: amountUsdc })
+          });
+          var data = await res.json();          if (data.ok) {
+            document.getElementById('seed-status').textContent = '✓ Seeded ' + data.seeded + ' cell(s) in window ' + selectedWindowId;
+          } else {
+            document.getElementById('seed-status').textContent = 'Error: ' + data.error;
+          }
+        } catch(e) {
+          document.getElementById('seed-status').textContent = 'Network error';
+        }
+        btn.disabled = false;
+        btn.textContent = 'Seed Selected';
+      });
+    })();
+  ` : "";
 
   return (
-    <html lang="en">
-      <head><title>BlocksRide Admin</title><style>{css}</style></head>
-      <body>
+    <>
+      <style>{css}</style>
+      <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
           <div>
             <h1>BlocksRide Admin</h1>
@@ -178,7 +381,6 @@ export default async function AdminPage() {
               <div className="row"><span className="label">Pending</span><span>{seeding.pending.join(", ")}</span></div>
               <div className="row"><span className="label">Range</span><span>{seeding.range}</span></div>
             </>}
-            <div style={{ marginTop: 12 }}><a href="/api/admin/seeding/status" target="_blank"><button>Status JSON</button></a></div>
           </div>
 
           {/* Bets */}
@@ -198,6 +400,75 @@ export default async function AdminPage() {
               {!env.SUPABASE_URL && "⚠ No Supabase — data lost on restart"}
             </div>
           </div>
+        </div>
+
+        {/* Manual Seed */}
+        <div className="card" style={{ marginTop: 16 }}>
+          <h2>Manual Seed</h2>
+          {!seedData
+            ? <div className="label">Price data unavailable — check RPC and pool config</div>
+            : <>
+                <div style={{ marginBottom: 10, fontSize: 13 }}>
+                  <span className="label">Price </span>
+                  <span id="seed-price" style={{ color: "#f5a623", fontWeight: 700 }}>${seedData.price.toFixed(2)}</span>
+                  <span className="label" style={{ marginLeft: 16 }}>Current Window </span>{seedData.currentWindowId}
+                </div>
+
+                {/* Window selector */}
+                <div style={{ marginBottom: 8, fontSize: 11, color: "#555" }}>Window to seed:</div>
+                <div className="seed-windows">
+                  {[0, 1, 2, 3].map(offset => {
+                    const wid = seedData.currentWindowId + seedData.frozenWindows + 1 + offset;
+                    const label = offset === 0 ? "next seedable" : `+${offset}`;
+                    return (
+                      <button
+                        key={wid}
+                        className={`win-btn${offset === 0 ? " active" : ""}`}
+                        data-wid={wid}
+                      >
+                        {wid} <span style={{ color: "#555" }}>({label})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Amount + actions */}
+                <div className="seed-controls">
+                  <label>Amount (USDC)</label>
+                  <input
+                    id="seed-amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    defaultValue={seedData.defaultAmountUsdc}
+                  />
+                  <button id="seed-all-btn" style={{ fontSize: 11 }}>Select All</button>
+                  <button id="seed-clear-btn" style={{ fontSize: 11 }}>Clear</button>
+                </div>
+
+                {/* Cell grid — 4 columns */}
+                <div className="seed-grid">
+                  {seedData.cells.map(cell => (
+                    <div
+                      key={cell.id}
+                      className={`seed-cell${cell.isCenter ? " center" : ""}`}
+                      data-cell-id={cell.id}
+                    >
+                      <div className="price">${cell.low}–{cell.high}</div>
+                      <div className="cell-id">cell {cell.id}{cell.isCenter ? " ◀ now" : ""}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="seed-btn-row">
+                  <button id="seed-submit-btn" style={{ background: "#f5a623", color: "#000", fontWeight: 700, border: "none" }}>
+                    Seed Selected
+                  </button>
+                  <span id="seed-count" style={{ fontSize: 11, color: "#555" }}>0 cells selected</span>
+                  <span id="seed-status" style={{ fontSize: 12, color: "#555" }}></span>
+                </div>
+              </>
+          }
         </div>
 
         {/* Recent Bets */}
@@ -243,13 +514,14 @@ export default async function AdminPage() {
               ["/api/pools", "Pools"],
               ["/api/rides/active", "Active Ride"],
               ["/api/public-price?asset_id=ETH-USD", "ETH Price"],
-              ["/api/admin/seeding/status", "Seeding"],
             ].map(([href, label]) => (
               <a key={href} href={href} target="_blank" rel="noreferrer"><button>{label}</button></a>
             ))}
           </div>
         </div>
-      </body>
-    </html>
+
+        {seedScript && <script dangerouslySetInnerHTML={{ __html: seedScript }} />}
+      </div>
+    </>
   );
 }

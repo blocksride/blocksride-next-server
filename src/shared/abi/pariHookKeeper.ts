@@ -59,6 +59,13 @@ export const pariHookKeeperAbi = [
   },
   {
     type: "function",
+    name: "seedWindow",
+    stateMutability: "nonpayable",
+    inputs: [poolKeyAbi, { name: "cellId", type: "uint256" }, { name: "windowId", type: "uint256" }, { name: "amount", type: "uint256" }],
+    outputs: []
+  },
+  {
+    type: "function",
     name: "settle",
     stateMutability: "payable",
     inputs: [poolKeyAbi, { name: "windowId", type: "uint256" }, { name: "pythUpdateData", type: "bytes" }],

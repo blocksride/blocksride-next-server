@@ -134,7 +134,7 @@ export async function seedArmedWindows(): Promise<void> {
         account,
         address: hookAddress,
         abi: pariHookKeeperAbi,
-        functionName: "placeBet",
+        functionName: "seedWindow",
         args: [pool.poolKey, cell, BigInt(windowId), SEED_AMOUNT_USDC]
       });
       await publicClient.waitForTransactionReceipt({ hash });
