@@ -77,14 +77,20 @@ export async function pushReadyPayouts(): Promise<void> {
       }
 
       const hookAddress = getAddress(pool.poolKey.hooks);
-      const currentWindowId = Number(
-        await publicClient.readContract({
-          address: hookAddress,
-          abi: pariHookKeeperAbi,
-          functionName: "currentWindowId",
-          args: [pool.poolKey]
-        })
-      );
+      let currentWindowId: number;
+      try {
+        currentWindowId = Number(
+          await publicClient.readContract({
+            address: hookAddress,
+            abi: pariHookKeeperAbi,
+            functionName: "currentWindowId",
+            args: [pool.poolKey]
+          })
+        );
+      } catch {
+        console.warn(`[payouts] pool ${pool.name ?? pool.poolId} grid not configured, skipping`);
+        continue;
+      }
 
       const startWindow = Math.max(0, currentWindowId - env.PAYOUT_PUSH_LOOKBACK_WINDOWS);
       const currentBlock = await publicClient.getBlockNumber();

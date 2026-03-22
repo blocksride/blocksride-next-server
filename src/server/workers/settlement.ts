@@ -80,14 +80,20 @@ export async function settleReadyWindows(): Promise<void> {
       }
 
       const hookAddress = getAddress(pool.poolKey.hooks);
-      const currentWindowId = Number(
-        await publicClient.readContract({
-          address: hookAddress,
-          abi: pariHookKeeperAbi,
-          functionName: "currentWindowId",
-          args: [pool.poolKey]
-        })
-      );
+      let currentWindowId: number;
+      try {
+        currentWindowId = Number(
+          await publicClient.readContract({
+            address: hookAddress,
+            abi: pariHookKeeperAbi,
+            functionName: "currentWindowId",
+            args: [pool.poolKey]
+          })
+        );
+      } catch {
+        console.warn(`[settlement] pool ${pool.name ?? pool.poolId} grid not configured, skipping`);
+        continue;
+      }
 
       const startWindow = Math.max(0, currentWindowId - env.SETTLEMENT_LOOKBACK_WINDOWS);
       let settledCount = 0;
@@ -97,8 +103,8 @@ export async function settleReadyWindows(): Promise<void> {
           break;
         }
 
-        const windowEnd = pool.gridEpoch + (windowId + 1) * pool.windowDurationSec;
-        if (nowSec < windowEnd) {
+        const windowStart = pool.gridEpoch + windowId * pool.windowDurationSec;
+        if (nowSec < windowStart) {
           continue;
         }
 
@@ -114,7 +120,7 @@ export async function settleReadyWindows(): Promise<void> {
         }
 
         try {
-          const vaa = await fetchPythVaa(pool.priceFeedId, windowEnd);
+          const vaa = await fetchPythVaa(pool.priceFeedId, windowStart);
           const updateFee = await publicClient.readContract({
             address: pythAddress,
             abi: pythFeeAbi,
