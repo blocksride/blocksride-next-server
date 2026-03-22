@@ -96,7 +96,7 @@ export async function pushReadyPayouts(): Promise<void> {
           : 0n;
 
       for (let windowId = startWindow; windowId <= currentWindowId; windowId += 1) {
-        const [, settled, voided, winningCell] = await publicClient.readContract({
+        const [, settled, voided, , winningCell] = await publicClient.readContract({
           address: hookAddress,
           abi: pariHookKeeperAbi,
           functionName: "getWindow",
