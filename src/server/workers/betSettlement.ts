@@ -66,7 +66,7 @@ async function settleBetRecords(): Promise<void> {
 
       try {
         const hookAddress = getAddress(pool.poolKey.hooks);
-        const [, settled, voided, winningCell, redemptionRate] = await publicClient.readContract({
+        const [, settled, voided, , winningCell, redemptionRate] = await publicClient.readContract({
           address: hookAddress,
           abi: pariHookKeeperAbi,
           functionName: "getWindow",

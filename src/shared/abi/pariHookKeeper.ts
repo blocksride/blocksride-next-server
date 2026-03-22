@@ -46,6 +46,7 @@ export const pariHookKeeperAbi = [
       { name: "totalPool", type: "uint256" },
       { name: "settled", type: "bool" },
       { name: "voided", type: "bool" },
+      { name: "unresolved", type: "bool" },
       { name: "winningCell", type: "uint256" },
       { name: "redemptionRate", type: "uint256" }
     ]
