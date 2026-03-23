@@ -4,7 +4,7 @@
  */
 import { getAddress, isAddress } from "viem";
 
-import { getKeeperPools, type PoolKeyConfig } from "@/server/config/pools";
+import { getKeeperPools, type KeeperPoolConfig } from "@/server/config/pools";
 import { getPublicClient } from "@/server/chain/client";
 import { pariHookKeeperAbi } from "@/shared/abi/pariHookKeeper";
 import { getConfirmedBetRecords, updateWindowBetOutcomes, type BetRecord } from "@/server/supabase/bets";
@@ -39,7 +39,7 @@ async function settleBetRecords(): Promise<void> {
     const publicClient = getPublicClient();
 
     // Group bets by poolId + windowId to minimize RPC calls
-    const groups = new Map<string, { poolId: string; windowId: string; records: BetRecord[]; pool?: PoolKeyConfig }>();
+    const groups = new Map<string, { poolId: string; windowId: string; records: BetRecord[]; pool?: KeeperPoolConfig }>();
 
     for (const record of confirmed) {
       const key = `${record.pool_id}:${record.window_id}`;
