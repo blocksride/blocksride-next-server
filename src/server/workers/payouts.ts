@@ -5,11 +5,14 @@ import type { PoolKeyConfig } from "@/server/config/pools";
 import { env } from "@/server/config/env";
 import { getKeeperPools } from "@/server/config/pools";
 import { betPlacedEvent, pariHookKeeperAbi, payoutPushedEvent } from "@/shared/abi/pariHookKeeper";
+import { getKeeperCursor, setKeeperCursor } from "@/server/supabase/cursors";
+import { getWonBetWallets } from "@/server/supabase/bets";
 
 let payoutPushTimer: NodeJS.Timeout | null = null;
 let payoutPushInFlight = false;
 
 const MAX_UINT256 = (1n << 256n) - 1n;
+const MAX_LOG_BLOCK_RANGE = 9_999n;
 
 export type PayoutPushWorkerStatus =
   | {
@@ -94,12 +97,11 @@ export async function pushReadyPayouts(): Promise<void> {
 
       const startWindow = Math.max(0, currentWindowId - env.PAYOUT_PUSH_LOOKBACK_WINDOWS);
       const currentBlock = await publicClient.getBlockNumber();
+      const cursorKey = `payout:${pool.poolId}`;
+      const savedCursor = await getKeeperCursor(cursorKey);
       const lookbackBlocks = BigInt(Math.ceil((env.PAYOUT_PUSH_LOOKBACK_WINDOWS * pool.windowDurationSec) / 2) + 200);
-      const fromBlock = pool.fromBlock
-        ? BigInt(pool.fromBlock)
-        : currentBlock > lookbackBlocks
-          ? currentBlock - lookbackBlocks
-          : 0n;
+      const deployFromBlock = pool.fromBlock ? BigInt(pool.fromBlock) : currentBlock > lookbackBlocks ? currentBlock - lookbackBlocks : 0n;
+      const fromBlock = savedCursor ?? deployFromBlock;
 
       for (let windowId = startWindow; windowId <= currentWindowId; windowId += 1) {
         const [, settled, voided, , winningCell] = await publicClient.readContract({
@@ -113,13 +115,18 @@ export async function pushReadyPayouts(): Promise<void> {
           continue;
         }
 
-        await pushPayoutsForWindow({
+        const scannedTo = await pushPayoutsForWindow({
           poolKey: pool.poolKey,
           poolId: pool.poolId,
           windowId: BigInt(windowId),
           winningCell,
-          fromBlock
+          fromBlock,
+          currentBlock,
         });
+
+        if (scannedTo !== null) {
+          await setKeeperCursor(cursorKey, scannedTo);
+        }
       }
     }
   } catch (error) {
@@ -135,9 +142,10 @@ type PushWindowArgs = {
   windowId: bigint;
   winningCell: bigint;
   fromBlock: bigint;
+  currentBlock: bigint;
 };
 
-async function pushPayoutsForWindow({ poolKey, poolId, windowId, winningCell, fromBlock }: PushWindowArgs): Promise<void> {
+async function pushPayoutsForWindow({ poolKey, poolId, windowId, winningCell, fromBlock, currentBlock }: PushWindowArgs): Promise<bigint | null> {
   const publicClient = getPublicClient();
   const walletClient = getKeeperWalletClient();
   const account = walletClient.account;
@@ -146,44 +154,58 @@ async function pushPayoutsForWindow({ poolKey, poolId, windowId, winningCell, fr
   }
 
   const hookAddress = getAddress(poolKey.hooks);
+
+  // ── Step 1: DB winners (fast path) ───────────────────────────────────────
+  const dbWallets = await getWonBetWallets(poolId, windowId.toString());
+  const dbWinners = new Set<Address>(dbWallets.map(getAddress));
+
+  // ── Step 2: On-chain log scan (source of truth) ───────────────────────────
   const [betLogs, pushedLogs] = await Promise.all([
-    publicClient.getLogs({
-      address: hookAddress,
-      event: betPlacedEvent,
-      args: { poolId, windowId, cellId: winningCell },
-      fromBlock,
-      toBlock: "latest"
-    }),
-    publicClient.getLogs({
-      address: hookAddress,
-      event: payoutPushedEvent,
-      args: { poolId, windowId },
-      fromBlock,
-      toBlock: "latest"
-    })
+    getLogsInChunks((chunkFrom, chunkTo) =>
+      publicClient.getLogs({
+        address: hookAddress,
+        event: betPlacedEvent,
+        args: { poolId, windowId, cellId: winningCell },
+        fromBlock: chunkFrom,
+        toBlock: chunkTo
+      }), fromBlock, currentBlock),
+    getLogsInChunks((chunkFrom, chunkTo) =>
+      publicClient.getLogs({
+        address: hookAddress,
+        event: payoutPushedEvent,
+        args: { poolId, windowId },
+        fromBlock: chunkFrom,
+        toBlock: chunkTo
+      }), fromBlock, currentBlock)
   ]);
 
-  const winners = new Set<Address>();
+  const logWinners = new Set<Address>();
   for (const log of betLogs) {
-    const bettor = log.args.bettor;
-    if (bettor) {
-      winners.add(getAddress(bettor));
-    }
+    if (log.args.bettor) logWinners.add(getAddress(log.args.bettor));
   }
 
+  // ── Step 3: Reconcile — union of both sets ────────────────────────────────
+  // DB may be missing direct on-chain bets; logs may be missing if relayer was
+  // down. Merging both gives the most complete winner list.
+  const allWinners = new Set<Address>([...dbWinners, ...logWinners]);
+
+  const onChainGap = [...logWinners].filter((w) => !dbWinners.has(w));
+  if (onChainGap.length > 0) {
+    console.warn(`[payouts] ${onChainGap.length} winner(s) in logs but not in DB for window ${windowId} — direct on-chain bets?`, onChainGap);
+  }
+
+  // ── Step 4: Exclude already-paid ─────────────────────────────────────────
   const alreadyPushed = new Set<Address>();
   for (const log of pushedLogs) {
-    const winner = log.args.winner;
-    if (winner) {
-      alreadyPushed.add(getAddress(winner));
-    }
+    if (log.args.winner) alreadyPushed.add(getAddress(log.args.winner));
   }
 
-  const pending = [...winners].filter((winner) => !alreadyPushed.has(winner));
+  const pending = [...allWinners].filter((w) => !alreadyPushed.has(w));
   if (pending.length === 0) {
-    return;
+    return currentBlock;
   }
 
+  // ── Step 5: Push payouts in batches ──────────────────────────────────────
   for (const batch of chunk(pending, env.PAYOUT_PUSH_MAX_WINNERS_PER_TX)) {
     const txHash = await walletClient.writeContract({
       account,
@@ -196,6 +218,32 @@ async function pushPayoutsForWindow({ poolKey, poolId, windowId, winningCell, fr
     await publicClient.waitForTransactionReceipt({ hash: txHash });
     console.log(`[workers] pushed payouts for pool ${poolId} window ${windowId} winners=${batch.length} tx=${txHash}`);
   }
+
+  return currentBlock;
+}
+
+async function getLogsInChunks<T>(
+  fetchChunk: (fromBlock: bigint, toBlock: bigint) => Promise<T[]>,
+  fromBlock: bigint,
+  toBlock: bigint
+): Promise<T[]> {
+  if (fromBlock > toBlock) {
+    return [];
+  }
+
+  const logs: T[] = [];
+  let chunkFrom = fromBlock;
+
+  while (chunkFrom <= toBlock) {
+    const chunkTo = chunkFrom + MAX_LOG_BLOCK_RANGE < toBlock
+      ? chunkFrom + MAX_LOG_BLOCK_RANGE
+      : toBlock;
+
+    logs.push(...(await fetchChunk(chunkFrom, chunkTo)));
+    chunkFrom = chunkTo + 1n;
+  }
+
+  return logs;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {

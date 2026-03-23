@@ -112,6 +112,19 @@ export async function getBetRecordsByWallet(walletAddress: string, limit = 100):
   }
 }
 
+export async function getWonBetWallets(poolId: string, windowId: string): Promise<string[]> {
+  try {
+    const rows = await supabaseRequest<{ wallet_address: string }[]>(
+      `/bet_records?pool_id=eq.${encodeURIComponent(poolId)}&window_id=eq.${encodeURIComponent(windowId)}&state=eq.won&select=wallet_address`
+    );
+    return rows.map((r) => r.wallet_address);
+  } catch {
+    return Array.from(inMemoryBets.values())
+      .filter((b) => b.pool_id.toLowerCase() === poolId.toLowerCase() && b.window_id === windowId && b.state === "won")
+      .map((b) => b.wallet_address);
+  }
+}
+
 export async function getConfirmedBetRecords(limit = 500): Promise<BetRecord[]> {
   try {
     return await supabaseRequest<BetRecord[]>(
