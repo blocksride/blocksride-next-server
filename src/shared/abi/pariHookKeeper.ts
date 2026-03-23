@@ -74,6 +74,20 @@ export const pariHookKeeperAbi = [
   },
   {
     type: "function",
+    name: "finalizeUnresolved",
+    stateMutability: "nonpayable",
+    inputs: [poolKeyAbi, { name: "windowId", type: "uint256" }],
+    outputs: []
+  },
+  {
+    type: "function",
+    name: "getUnresolvedWindows",
+    stateMutability: "view",
+    inputs: [poolKeyAbi],
+    outputs: [{ name: "", type: "uint256[]" }]
+  },
+  {
+    type: "function",
     name: "pushPayouts",
     stateMutability: "nonpayable",
     inputs: [poolKeyAbi, { name: "windowId", type: "uint256" }, { name: "winners", type: "address[]" }],

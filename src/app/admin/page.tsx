@@ -2,41 +2,37 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAddress } from "viem";
 
+import { createAdminSessionToken, getAdminSessionCookieOptions, matchesAdminPassword, ADMIN_COOKIE_NAME, verifyAdminSessionToken } from "@/server/auth/admin";
 import { getKeeperPools } from "@/server/config/pools";
 import { getSeedingStatus } from "@/server/seeding/state";
 import { env } from "@/server/config/env";
 import type { BetRecord } from "@/server/supabase/bets";
 import { getPublicClient } from "@/server/chain/client";
 import { getPublicPrice, isSupportedPublicPriceAsset } from "@/server/market-data/publicPrice";
+import {
+  listAwaitingCloseWindows,
+  listPendingSettlementWindows,
+  type AwaitingCloseWindow,
+  type PendingSettlementWindow
+} from "@/server/settlement/admin";
 import { pariHookKeeperAbi } from "@/shared/abi/pariHookKeeper";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ADMIN_COOKIE = "admin_session";
-const ADMIN_COOKIE_MAX_AGE = 60 * 60 * 8; // 8 hours
-
-function getAdminSecret(): string {
-  return env.ADMIN_SECRET ?? env.ADMIN_USER_IDS ?? "changeme";
-}
-
 async function checkAdminAuth(): Promise<boolean> {
   const cookieStore = await cookies();
-  const val = cookieStore.get(ADMIN_COOKIE)?.value;
-  return val === getAdminSecret();
+  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+  return Boolean(token && verifyAdminSessionToken(token));
 }
 
 async function loginAction(formData: FormData) {
   "use server";
-  const password = formData.get("password") as string;
-  if (password === getAdminSecret()) {
+  const password = String(formData.get("password") ?? "");
+  if (matchesAdminPassword(password)) {
     const cookieStore = await cookies();
-    cookieStore.set(ADMIN_COOKIE, password, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/admin",
-      maxAge: ADMIN_COOKIE_MAX_AGE,
-    });
+    const options = getAdminSessionCookieOptions();
+    cookieStore.set(options.name, createAdminSessionToken(), options);
   }
   redirect("/admin");
 }
@@ -80,6 +76,9 @@ type SeedData = {
   windowDurationSec: number;
   defaultAmountUsdc: string;
 } | null;
+
+type PendingSettlementData = PendingSettlementWindow[];
+type AwaitingCloseData = AwaitingCloseWindow[];
 
 async function getAdminSeedData(): Promise<SeedData> {
   const pools = getKeeperPools();
@@ -144,6 +143,26 @@ async function getAdminSeedData(): Promise<SeedData> {
   }
 }
 
+async function getPendingSettlementData(): Promise<PendingSettlementData> {
+  try {
+    return await listPendingSettlementWindows({
+      lookbackWindows: Math.max(env.SETTLEMENT_LOOKBACK_WINDOWS, 20)
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function getAwaitingCloseData(): Promise<AwaitingCloseData> {
+  try {
+    return await listAwaitingCloseWindows({
+      lookbackWindows: Math.max(env.SETTLEMENT_LOOKBACK_WINDOWS, 20)
+    });
+  } catch {
+    return [];
+  }
+}
+
 const STATE_COLORS: Record<string, string> = {
   pending: "#f59e0b",
   confirmed: "#3b82f6",
@@ -198,6 +217,7 @@ const css = `
   .win-btn.active { background: #1a1a0a; border-color: #f5a623; color: #f5a623; }
   .seed-btn-row { display: flex; gap: 8px; align-items: center; }
   #seed-status { font-size: 12px; color: #555; }
+  .action-btn { font-size: 11px; padding: 4px 10px; }
 `;
 
 function LoginPage() {
@@ -207,10 +227,12 @@ function LoginPage() {
       <div className="login-wrap">
         <div className="login-box">
           <h1>Admin</h1>
-          <form action={loginAction}>
-            <input type="password" name="password" placeholder="Admin secret" autoFocus />
-            <button type="submit" className="submit">Enter</button>
-          </form>
+          <div className="sub" style={{ marginBottom: 12 }}>
+            Enter the admin password to access the dashboard.
+          </div>
+          <div className="label">
+            <form action={loginAction}><input type="password" name="password" placeholder="Admin password" autoFocus /><button type="submit" className="submit">Enter</button></form>
+          </div>
         </div>
       </div>
     </>
@@ -227,6 +249,10 @@ export default async function AdminPage() {
   const recentBets = getRecentBets();
   const nowSec = Math.floor(Date.now() / 1000);
   const seedData = await getAdminSeedData();
+  const [pendingSettlements, awaitingCloseWindows] = await Promise.all([
+    getPendingSettlementData(),
+    getAwaitingCloseData()
+  ]);
 
   const seedScript = seedData ? `
     (function() {
@@ -310,7 +336,7 @@ export default async function AdminPage() {
         btn.textContent = 'Seeding...';
         document.getElementById('seed-status').textContent = 'Submitting ' + cells.length + ' cell(s) for window ' + selectedWindowId + '...';
         try {
-          var res = await fetch('/admin/seed-direct', {
+          var res = await fetch('/api/admin/seeding/direct', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             credentials: 'include',
@@ -326,6 +352,50 @@ export default async function AdminPage() {
         }
         btn.disabled = false;
         btn.textContent = 'Seed Selected';
+      });
+    })();
+  ` : "";
+
+  const settlementScript = pendingSettlements.length > 0 ? `
+    (function() {
+      var statusEl = document.getElementById('settlement-status');
+      document.querySelectorAll('[data-settle-window]').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          var poolId = btn.getAttribute('data-pool-id');
+          var windowId = Number(btn.getAttribute('data-window-id'));
+          if (!poolId || Number.isNaN(windowId)) return;
+          btn.disabled = true;
+          var originalText = btn.textContent;
+          btn.textContent = 'Submitting...';
+          if (statusEl) {
+            statusEl.textContent = 'Submitting settlement for window ' + windowId + '...';
+          }
+          try {
+            var res = await fetch('/api/admin/settlement/settle', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ poolId: poolId, windowId: windowId })
+            });
+            var data = await res.json();
+            if (data.ok) {
+              if (statusEl) {
+                statusEl.textContent = '✓ ' + data.action + ' submitted for window ' + windowId;
+              }
+              setTimeout(function() { window.location.reload(); }, 1200);
+              return;
+            }
+            if (statusEl) {
+              statusEl.textContent = 'Error: ' + (data.error || 'request failed');
+            }
+          } catch (error) {
+            if (statusEl) {
+              statusEl.textContent = 'Network error';
+            }
+          }
+          btn.disabled = false;
+          btn.textContent = originalText;
+        });
       });
     })();
   ` : "";
@@ -381,6 +451,79 @@ export default async function AdminPage() {
               <div className="row"><span className="label">Pending</span><span>{seeding.pending.join(", ")}</span></div>
               <div className="row"><span className="label">Range</span><span>{seeding.range}</span></div>
             </>}
+          </div>
+
+          {/* Open / Awaiting Close */}
+          <div className="card">
+            <h2>Open / Awaiting Close</h2>
+            {awaitingCloseWindows.length === 0
+              ? <div className="label">No open windows in the current lookback range</div>
+              : <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Asset</th><th>Window</th><th>Total Pool</th><th>Closes</th><th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {awaitingCloseWindows.map((window) => (
+                        <tr key={`${window.poolId}-${window.windowId}`}>
+                          <td>{window.name ?? window.assetId}</td>
+                          <td>{window.windowId}</td>
+                          <td>${(Number(window.totalPool) / 1_000_000).toFixed(2)}</td>
+                          <td style={{ color: "#555" }}>{new Date(window.resolutionDeadline * 1000).toLocaleTimeString()}</td>
+                          <td><span className="badge warn">awaiting_close</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+            }
+          </div>
+
+          {/* Pending Settlement */}
+          <div className="card">
+            <h2>Pending Settlement</h2>
+            {pendingSettlements.length === 0
+              ? <div className="label">No closed unsettled windows in the current lookback range</div>
+              : <>
+                  <div style={{ overflowX: "auto" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Asset</th><th>Window</th><th>Total Pool</th><th>Status</th><th>Closed At</th><th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingSettlements.map((window) => (
+                          <tr key={`${window.poolId}-${window.windowId}`}>
+                            <td>{window.name ?? window.assetId}</td>
+                            <td>{window.windowId}</td>
+                            <td>${(Number(window.totalPool) / 1_000_000).toFixed(2)}</td>
+                            <td>
+                              <span className={`badge ${window.unsettledStatus === "ready_to_settle" ? "ok" : "warn"}`}>
+                                {window.unsettledStatus}
+                              </span>
+                            </td>
+                            <td style={{ color: "#555" }}>{new Date(window.resolutionDeadline * 1000).toLocaleTimeString()}</td>
+                            <td>
+                              <button
+                                className="action-btn"
+                                data-settle-window="1"
+                                data-pool-id={window.poolId}
+                                data-window-id={window.windowId}
+                              >
+                                {window.canFinalizeUnresolved ? "Finalize" : "Settle"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div id="settlement-status" style={{ marginTop: 10, fontSize: 12, color: "#555" }} />
+                </>
+            }
           </div>
 
           {/* Bets */}
@@ -521,6 +664,7 @@ export default async function AdminPage() {
         </div>
 
         {seedScript && <script dangerouslySetInnerHTML={{ __html: seedScript }} />}
+        {settlementScript && <script dangerouslySetInnerHTML={{ __html: settlementScript }} />}
       </div>
     </>
   );

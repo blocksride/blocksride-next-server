@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSyntheticCells, getSyntheticGridByContest } from "@/server/grid/synthetic";
+import { getPublicPrice, isSupportedPublicPriceAsset } from "@/server/market-data/publicPrice";
 import { getRideById } from "@/server/supabase/client";
 
 export const runtime = "nodejs";
@@ -22,10 +23,15 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Contest has no grid yet" }, { status: 404 });
     }
 
+    const priceResult = isSupportedPublicPriceAsset(contest.asset_id)
+      ? await getPublicPrice(contest.asset_id)
+      : null;
+    const anchorPrice = priceResult?.price ?? 0;
+
     return NextResponse.json({
       contest,
       grid,
-      cells: getSyntheticCells(grid.grid_id)
+      cells: getSyntheticCells(grid.grid_id, anchorPrice)
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "failed to fetch contest grid";
