@@ -1,5 +1,7 @@
 import { getAddress, maxUint256 } from "viem";
 
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
+
 import { getKeeperWalletClient, getPublicClient } from "@/server/chain/client";
 import { env } from "@/server/config/env";
 import { getKeeperPools } from "@/server/config/pools";
@@ -124,7 +126,8 @@ export async function seedArmedWindows(): Promise<void> {
         address: getAddress(config[7]),
         abi: usdcAbi,
         functionName: "approve",
-        args: [hookAddress, maxUint256]
+        args: [hookAddress, maxUint256],
+        dataSuffix: BUILDER_CODE_SUFFIX,
       });
       await publicClient.waitForTransactionReceipt({ hash: approvalHash });
     }
@@ -135,7 +138,8 @@ export async function seedArmedWindows(): Promise<void> {
         address: hookAddress,
         abi: pariHookKeeperAbi,
         functionName: "seedWindow",
-        args: [pool.poolKey, cell, BigInt(windowId), SEED_AMOUNT_USDC]
+        args: [pool.poolKey, cell, BigInt(windowId), SEED_AMOUNT_USDC],
+        dataSuffix: BUILDER_CODE_SUFFIX,
       });
       await publicClient.waitForTransactionReceipt({ hash });
     }

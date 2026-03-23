@@ -1,5 +1,7 @@
 import { getAddress, type Address } from "viem";
 
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
+
 import { getKeeperAccount, getKeeperWalletClient, getPublicClient } from "@/server/chain/client";
 import type { PoolKeyConfig } from "@/server/config/pools";
 import { env } from "@/server/config/env";
@@ -212,7 +214,8 @@ async function pushPayoutsForWindow({ poolKey, poolId, windowId, winningCell, fr
       address: hookAddress,
       abi: pariHookKeeperAbi,
       functionName: "pushPayouts",
-      args: [poolKey, windowId, batch]
+      args: [poolKey, windowId, batch],
+      dataSuffix: BUILDER_CODE_SUFFIX,
     });
 
     await publicClient.waitForTransactionReceipt({ hash: txHash });

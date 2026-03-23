@@ -1,5 +1,7 @@
 import { getAddress, type Hex } from "viem";
 
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
+
 import { getPublicClient, getKeeperAccount, getKeeperWalletClient } from "@/server/chain/client";
 import { getKeeperPoolByPoolId, getKeeperPools, type KeeperPoolConfig } from "@/server/config/pools";
 import { env } from "@/server/config/env";
@@ -215,7 +217,8 @@ export async function settleWindowAsAdmin(input: { poolId?: string; assetId?: st
       address: hookAddress,
       abi: pariHookKeeperAbi,
       functionName: "finalizeUnresolved",
-      args: [pool.poolKey, BigInt(input.windowId)]
+      args: [pool.poolKey, BigInt(input.windowId)],
+      dataSuffix: BUILDER_CODE_SUFFIX,
     });
 
     return {
@@ -242,7 +245,8 @@ export async function settleWindowAsAdmin(input: { poolId?: string; assetId?: st
     abi: pariHookKeeperAbi,
     functionName: "settle",
     args: [pool.poolKey, BigInt(input.windowId), vaa],
-    value: updateFee
+    value: updateFee,
+    dataSuffix: BUILDER_CODE_SUFFIX,
   });
 
   return {

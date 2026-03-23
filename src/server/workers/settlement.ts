@@ -1,5 +1,7 @@
 import { getAddress, isAddress, type Hex } from "viem";
 
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
+
 import { getKeeperPools } from "@/server/config/pools";
 import { env } from "@/server/config/env";
 import { getKeeperAccount, getKeeperWalletClient, getPublicClient } from "@/server/chain/client";
@@ -134,7 +136,8 @@ export async function settleReadyWindows(): Promise<void> {
             abi: pariHookKeeperAbi,
             functionName: "settle",
             args: [pool.poolKey, BigInt(windowId), vaa],
-            value: updateFee
+            value: updateFee,
+            dataSuffix: BUILDER_CODE_SUFFIX,
           });
 
           settledCount += 1;

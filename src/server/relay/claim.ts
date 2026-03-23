@@ -1,3 +1,4 @@
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
 import {
   encodeAbiParameters,
   encodeFunctionData,
@@ -101,7 +102,8 @@ export async function submitClaim(intent: ClaimIntent): Promise<`0x${string}`> {
     address: getHookAddress(),
     abi: pariHookWriteAbi,
     functionName: "claimAllFor",
-    args: [toAbiPoolKey(intent.poolKey), intent.windowIds, intent.user, intent.deadline, v, r, s]
+    args: [toAbiPoolKey(intent.poolKey), intent.windowIds, intent.user, intent.deadline, v, r, s],
+    dataSuffix: BUILDER_CODE_SUFFIX,
   });
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;

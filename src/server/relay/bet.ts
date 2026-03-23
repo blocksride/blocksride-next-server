@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
+
 import {
   encodeAbiParameters,
   encodeFunctionData,
@@ -270,7 +272,8 @@ async function submitBet(intent: BetIntent): Promise<{ permitTxHash?: Hex; betTx
       address: getUsdcAddress(),
       abi: usdcAbi,
       functionName: "permit",
-      args: [intent.signer, hookAddress, intent.permit.value, intent.permit.deadline, intent.permit.v, intent.permit.r, intent.permit.s]
+      args: [intent.signer, hookAddress, intent.permit.value, intent.permit.deadline, intent.permit.v, intent.permit.r, intent.permit.s],
+      dataSuffix: BUILDER_CODE_SUFFIX,
     });
     await publicClient.waitForTransactionReceipt({ hash: permitTxHash });
   }
@@ -280,7 +283,8 @@ async function submitBet(intent: BetIntent): Promise<{ permitTxHash?: Hex; betTx
     address: hookAddress,
     abi: pariHookWriteAbi,
     functionName: "placeBetWithSig",
-    args: [toAbiPoolKey(intent.poolKey), intent.cellId, intent.windowId, intent.amount, intent.signer, intent.nonce, intent.deadline, intent.signature]
+    args: [toAbiPoolKey(intent.poolKey), intent.cellId, intent.windowId, intent.amount, intent.signer, intent.nonce, intent.deadline, intent.signature],
+    dataSuffix: BUILDER_CODE_SUFFIX,
   });
   await publicClient.waitForTransactionReceipt({ hash: betTxHash });
 

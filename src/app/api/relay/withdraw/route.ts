@@ -3,6 +3,7 @@ import { getAddress, isAddress, type Hex } from "viem";
 import { z } from "zod";
 
 import { env } from "@/server/config/env";
+import { BUILDER_CODE_SUFFIX } from "@/server/config/constants";
 import { getPublicClient, getRelayerAccount, getWalletClient } from "@/server/chain/client";
 import { usdcAbi } from "@/shared/abi/usdc";
 import { saveWithdrawalRecord, updateWithdrawalRecord } from "@/server/supabase/withdrawals";
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
         body.r as Hex,
         body.s as Hex,
       ],
+      dataSuffix: BUILDER_CODE_SUFFIX,
     });
     await publicClient.waitForTransactionReceipt({ hash: pullHash });
 
@@ -88,6 +90,7 @@ export async function POST(request: Request) {
       functionName: "transfer",
       nonce: nonce0 + 1,
       args: [getAddress(body.to), amount - WITHDRAWAL_FEE],
+      dataSuffix: BUILDER_CODE_SUFFIX,
     });
     await publicClient.waitForTransactionReceipt({ hash: sendHash });
 
@@ -99,6 +102,7 @@ export async function POST(request: Request) {
       functionName: "transfer",
       nonce: nonce0 + 2,
       args: [getAddress(treasury), WITHDRAWAL_FEE],
+      dataSuffix: BUILDER_CODE_SUFFIX,
     });
     await publicClient.waitForTransactionReceipt({ hash: feeHash });
 
