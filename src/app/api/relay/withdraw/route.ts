@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAddress, isAddress, hexToNumber, slice, type Hex } from "viem";
+import { getAddress, isAddress, type Hex } from "viem";
 import { z } from "zod";
 
 import { env } from "@/server/config/env";
@@ -46,12 +46,16 @@ export async function POST(request: Request) {
     const walletClient = getWalletClient();
     const relayer = getRelayerAccount();
 
+    // Fetch pending nonce once — avoids conflicts with concurrent worker txs
+    const nonce0 = await publicClient.getTransactionCount({ address: relayer.address, blockTag: "pending" });
+
     // Step 1: pull full amount from user → relayer via EIP-3009
     const pullHash = await walletClient.writeContract({
       account: relayer,
       address: usdcAddress,
       abi: usdcAbi,
       functionName: "transferWithAuthorization",
+      nonce: nonce0,
       args: [
         getAddress(body.from),
         relayer.address,
@@ -72,6 +76,7 @@ export async function POST(request: Request) {
       address: usdcAddress,
       abi: usdcAbi,
       functionName: "transfer",
+      nonce: nonce0 + 1,
       args: [getAddress(body.to), amount - WITHDRAWAL_FEE],
     });
     await publicClient.waitForTransactionReceipt({ hash: sendHash });
@@ -82,6 +87,7 @@ export async function POST(request: Request) {
       address: usdcAddress,
       abi: usdcAbi,
       functionName: "transfer",
+      nonce: nonce0 + 2,
       args: [getAddress(treasury), WITHDRAWAL_FEE],
     });
     await publicClient.waitForTransactionReceipt({ hash: feeHash });
