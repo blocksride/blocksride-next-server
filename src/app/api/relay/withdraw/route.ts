@@ -5,6 +5,7 @@ import { z } from "zod";
 import { env } from "@/server/config/env";
 import { getPublicClient, getRelayerAccount, getWalletClient } from "@/server/chain/client";
 import { usdcAbi } from "@/shared/abi/usdc";
+import { saveWithdrawalRecord, updateWithdrawalRecord } from "@/server/supabase/withdrawals";
 
 export const runtime = "nodejs";
 
@@ -45,6 +46,15 @@ export async function POST(request: Request) {
     const publicClient = getPublicClient();
     const walletClient = getWalletClient();
     const relayer = getRelayerAccount();
+
+    // Record withdrawal as pending before submitting
+    const recordId = await saveWithdrawalRecord({
+      wallet_address: body.from.toLowerCase(),
+      to_address: body.to.toLowerCase(),
+      amount: body.amount,
+      fee: WITHDRAWAL_FEE.toString(),
+      state: "pending",
+    });
 
     // Fetch pending nonce once — avoids conflicts with concurrent worker txs
     const nonce0 = await publicClient.getTransactionCount({ address: relayer.address, blockTag: "pending" });
@@ -91,6 +101,10 @@ export async function POST(request: Request) {
       args: [getAddress(treasury), WITHDRAWAL_FEE],
     });
     await publicClient.waitForTransactionReceipt({ hash: feeHash });
+
+    if (recordId) {
+      await updateWithdrawalRecord(recordId, { state: "completed", tx_hash: sendHash });
+    }
 
     return NextResponse.json({
       success: true,
